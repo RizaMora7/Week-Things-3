@@ -1,0 +1,21 @@
+# Salida del build (build.sh produce build/Semana.app)
+build/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# Bases del modo demo: se generan con Tools/makedemo.sh
+demo/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Residuos de versiones anteriores del icono
+*.anterior
+.scratch-*
+
+# Secretos de firma
+*.p12
+*.mobileprovision
