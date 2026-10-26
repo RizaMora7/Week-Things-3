@@ -257,6 +257,9 @@ tccutil reset SystemPolicyAllFiles cl.zamorano.semana
 
 ## Limitaciones honestas
 
+- **El tema no siempre persiste**: elegir *Oscuro* puede volver a *Claro* al relanzar. El
+  idioma sí se guarda, así que la sospecha está en `applyThemeMode` y en cómo el
+  `NSPopUpButton` reenvía su acción cuando se le selecciona un índice por código. Sin arreglar.
 - **Refresco**: las tareas *sin fecha* no envejecen solas en la base. Things calcula
   "Hoy" al abrirse; si no abres Things, una tarea programada para ayer seguirá apareciendo
   en su día y no en atrasadas hasta que Things vuelva a escribir. La app no simula ese
