@@ -198,22 +198,31 @@ enum Planner {
         return round == 0 && square == 0
     }
 
-    /// Urgencia: plazo hoy o vencido, o el tag "Urgent" de Things. Sin deadlines
-    /// cargadas, la etiqueta es la única señal explícita de urgencia que existe.
+    /// Urgencia: el tag `Urgent`, un plazo que ya venció o cae a más tardar mañana, o una
+    /// fecha programada que pasó y sigue abierta (Things la arrastra a Hoy).
+    ///
+    /// Ampliada el 2026-10-27. Con solo «plazo hoy o vencido» el eje estaba muerto en este
+    /// proyecto: casi no se usan deadlines y el tag `Urgent` aparece poco, así que Q1 y Q3
+    /// quedaban vacíos siempre y la matriz degeneraba en un solo eje.
     static func isUrgent(_ t: TaskItem, day: Date) -> Bool {
         if t.tags.contains("Urgent") { return true }
-        guard let dl = t.deadline else { return false }
-        return calendar.startOfDay(for: dl) <= calendar.startOfDay(for: day)
+        let today = calendar.startOfDay(for: day)
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) ?? today
+        if let dl = t.deadline, calendar.startOfDay(for: dl) <= tomorrow { return true }
+        if let s = t.scheduled, calendar.startOfDay(for: s) < today { return true }
+        return false
     }
 
-    /// Importancia según las etiquetas reales de este proyecto (Low/Medium/High):
-    /// Medium ya es una decisión de prioridad, tratarlo como "no importante" vaciaba
-    /// la matriz y dejaba todo en «suéltalo».
+    /// Importancia según la misma escalera que usan las tareas agendadas de QwenWork:
+    /// `Important` y `High` importan; `Medium`, `Low` o ninguna etiqueta, no.
+    ///
+    /// Antes bastaba con `Medium`, o con que la fila fuera un proyecto. Eso se escribió
+    /// cuando en este proyecto solo existían Low/Medium/High y tratar Medium como
+    /// «no importante» vaciaba la matriz. Desde que hay etiquetas `Important`, ese
+    /// compromiso borraba la diferencia: `Important` no decidía el cuadrante de nada.
+    /// Un proyecto solo puntúa si él mismo trae `Important` o `High`.
     static func isImportant(_ t: TaskItem) -> Bool {
-        if t.tags.contains("High") || t.tags.contains("Important") { return true }
-        if t.isProject { return true }
-        if t.tags.contains("Medium") { return true }
-        return false
+        return t.tags.contains("Important") || t.tags.contains("High")
     }
 
     /// Escalera de prioridad por etiqueta, en el orden que se pidió:
@@ -258,6 +267,19 @@ enum Planner {
         return max(0, d)
     }
 
+    /// ¿Pertenece esta tarea al plan de ese día? Con basta una de las dos señales:
+    /// agenda en ese día o antes, o plazo en ese día o antes.
+    ///
+    /// Corregido el 2026-10-27: antes el plazo tenía prioridad y hacía `return`, así que
+    /// una tarea agendada para hoy con plazo mañana quedaba fuera del plan de hoy. Es el
+    /// caso de la única `Important` del día, que desaparecía y dejaba Q1 vacío.
+    static func isRelevant(_ t: TaskItem, day: Date) -> Bool {
+        let dayStart = calendar.startOfDay(for: day)
+        if let dl = t.deadline, calendar.startOfDay(for: dl) <= dayStart { return true }
+        if let s = t.scheduled, calendar.startOfDay(for: s) <= dayStart { return true }
+        return false
+    }
+
     // MARK: construcción
 
     /// Construye el plan del día. `tasks` deben ser las que caen en ese día
@@ -267,11 +289,7 @@ enum Planner {
         var plan = DayPlan(framework: framework, day: day)
         let dayStart = calendar.startOfDay(for: day)
 
-        let relevant = tasks.filter { t in
-            if let dl = t.deadline { return calendar.startOfDay(for: dl) <= dayStart }
-            if let s = t.scheduled { return calendar.startOfDay(for: s) <= dayStart }
-            return false
-        }
+        let relevant = tasks.filter { isRelevant($0, day: day) }
         let sortedAll = relevant.sorted { byPriority($0, $1, day: day) }
 
         plan.events = events.sorted { $0.sortDate < $1.sortDate }

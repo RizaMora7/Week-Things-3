@@ -225,10 +225,10 @@ enum L {
         "fwS.moscow":       ("MoSCoW", "MoSCoW"),
         "fwS.135":          ("1-3-5", "1-3-5"),
         "fwS.pareto":       ("Top 3", "Top 3"),
-        "fx.eisenhower":    ("Urgencia = plazo hoy o vencido, o tag Urgent; importancia = tag High/Medium o " +
-                             "proyecto. Sin esas señales, Q1 y Q3 quedan vacías.",
-                             "Urgent = due today, overdue, or tagged Urgent; important = High/Medium tag or a " +
-                             "project. Without those signals Q1 and Q3 stay empty."),
+        "fx.eisenhower":    ("Urgencia = tag Urgent, plazo vencido o que cae mañana, o fecha programada ya " +
+                             "pasada. Importancia = tag Important o High; Medium, Low o sin etiqueta no puntúan.",
+                             "Urgent = tagged Urgent, overdue, or due tomorrow, or its programmed date has " +
+                             "passed. Important = tagged Important or High; Medium, Low or no tag don't count."),
         "fx.timeBlock":     ("Reparte el día en bloques según energía: profundo 90–120 min, administrativo " +
                              "30–60, baja energía 30, buffers 15.",
                              "Splits the day into energy-based blocks: deep 90–120 min, admin 30–60, " +

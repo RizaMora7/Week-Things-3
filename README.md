@@ -137,7 +137,7 @@ La vista solo pinta. Los seis marcos disponibles:
 
 | Marco | Qué decide | Con qué señal |
 |---|---|---|
-| Matriz de Eisenhower | 4 cuadrantes | urgencia = plazo hoy o vencido; importancia = tag High/Medium o proyecto |
+| Matriz de Eisenhower | 4 cuadrantes | urgencia = tag Urgent, plazo vencido o de mañana, o fecha programada pasada; importancia = tag Important o High |
 | Time blocking por energía | bloques 08:00–18:00 | tamaño estimado + hora (profundo antes que administrativo) |
 | Eat the Frog + 2 min + Parkinson | la rana, las victorias rápidas, hora de término | importancia + estimación ≥ 45 min |
 | MoSCoW | Must / Should / Could / Won't | capacidad libre del día: Must ~55 %, Should ~85 %, Won't el desborde |
@@ -146,7 +146,8 @@ La vista solo pinta. Los seis marcos disponibles:
 
 **Escalera de prioridad.** La lista «Tareas del día» no sigue el orden de los cuadrantes:
 ordena por etiqueta, de más a menos, y dentro del mismo escalón decide la urgencia real
-(plazo hoy o vencido), después el atraso y al final lo más corto primero:
+(tag `Urgent`, plazo vencido o que cae mañana, o fecha programada ya pasada), después el
+atraso y al final lo más corto primero:
 
 ```
 Important › Urgent › High › Medium › Low › sin etiqueta
@@ -276,9 +277,9 @@ tccutil reset SystemPolicyAllFiles cl.zamorano.semana
   recuerda la app por su firma.
 - **Estimación de esfuerzo**: los minutos del plan son deducidos (título/nota → checklist →
   etiquetas → 30 por defecto). Sirven para repartir el día, no para comprometerse con ellos.
-- **Eisenhower sin plazos**: si no usas `deadline` en Things, los cuadrantes Q1 y Q3 quedan
-  vacíos y todo cae en Q2/Q4. No es un fallo de la app: es que la señal de urgencia no
-  existe en tus datos. MoSCoW y 1-3-5 no dependen de eso.
+- **Eisenhower y tus etiquetas**: la matriz solo discrimina con `Important`, `High` y `Urgent`.
+  Si un día está lleno de `Medium` y `Low`, Q1 y Q3 salen cortos y «Suéltalo» grande: es la
+  lectura correcta, no un fallo. MoSCoW y 1-3-5 no dependen de las etiquetas.
 - **Calendario**: se muestra lo que `OccurrenceCache` ya expandió. Un recurrente recién
   creado o con un rango fuera de lo que Calendar cacheó puede tardar en aparecer; la app no
   calcula recurrencias por su cuenta.
