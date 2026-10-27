@@ -95,6 +95,12 @@ final class TaskCard: NSView {
             parts.append("✓ \(done)/\(i.totalChecklist)")
         }
         if i.recurring { parts.append("↻") }
+        // Con agenda y plazo en días distintos la tarjeta vive en el día agendado (ver
+        // TaskItem.placement), así que el plazo se anuncia aquí para no perderlo.
+        if let d = i.deadline, let s = i.scheduled,
+           !Calendar.current.isDate(d, inSameDayAs: s) {
+            parts.append(L.f("card.vence", DateFormat.dueShort.string(from: d)))
+        }
         if !i.tags.isEmpty { parts.append(i.tags.prefix(3).joined(separator: " ")) }
         return parts.joined(separator: "  ")
     }

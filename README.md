@@ -238,6 +238,11 @@ tccutil reset SystemPolicyAllFiles cl.zamorano.semana
 - **Hoy marcado**: en la vista semanal la columna del día de hoy lleva fondo teñido, borde
   de color y la cabecera `dom 25 · hoy`; en el plan del día el título añade `· hoy` y se
   pinta con el color de acento.
+- **En qué día cae cada tarjeta**: una tarea ocupa un solo día. Si tiene agenda y plazo,
+  gana la fecha **anterior**, o sea el día que planeaste trabajarla; el plazo se anuncia en
+  el pie de la tarjeta como `vence 28/10` y en su franja roja. Con una sola de las dos
+  fechas, esa manda. La vista Día es más amplia: ahí la tarea aparece en cuanto se cumple
+  cualquiera de las dos.
 - **Bandeja «Sin fecha»**: rejilla de varias filas al pie de la ventana (aprovecha el alto,
   no una sola línea con scroll horizontal). El desplegable **Alcance ▾** decide qué muestra:
   *Relevantes a esta semana* (los proyectos/áreas que ya tienen algo con fecha en la semana

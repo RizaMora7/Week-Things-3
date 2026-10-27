@@ -146,6 +146,8 @@ enum L {
         "day.hoyShort":     ("hoy", "today"),
         "col.overdue":      ("Atrasadas", "Overdue"),
         "col.previous":     ("Anteriores", "Earlier"),
+        /// Aviso en la tarjeta cuando el plazo cae en otro día del que la muestra.
+        "card.vence":       ("vence %@", "due %@"),
         "tray.undated":     ("Sin fecha", "Undated"),
         "tray.scope":       ("Alcance ▾", "Scope ▾"),
         "tray.scope.week":  ("Relevantes a esta semana", "Relevant to this week"),

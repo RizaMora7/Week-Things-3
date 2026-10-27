@@ -98,6 +98,18 @@ enum OrderCheck {
         if Planner.isRelevant(t16, day: today) {
             fallos.append("t16 con agenda y plazo futuros entró en el plan de hoy")
         }
+        // placement: con las dos fechas presentes gana la anterior.
+        if t15.placement.map({ !cal.isDate($0, inSameDayAs: today) }) ?? true {
+            fallos.append("t15 no se ubica en el día agendado (hoy)")
+        }
+        let soloPlazo = items.first { $0.id == "t02" }!
+        if soloPlazo.placement.map({ !cal.isDate($0, inSameDayAs: today) }) ?? true {
+            fallos.append("t02 con solo plazo perdió su ubicación")
+        }
+        if let p = items.first(where: { $0.id == "t05" })?.placement,
+           cal.isDate(p, inSameDayAs: today) {
+            fallos.append("t05 agendada en +3 días se muestra hoy")
+        }
         let u = items.filter { Planner.isUrgent($0, day: today) }.count
         let i = items.filter { Planner.isImportant($0) }.count
         if u == 0 { fallos.append("ninguna tarea urgente: el eje de urgencia volvió a morir") }

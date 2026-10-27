@@ -23,8 +23,21 @@ struct TaskItem: Identifiable, Equatable {
     var deadline: Date? { deadlineRaw.flatMap { ThingsDate.date(from: $0) } }
     var scheduled: Date? { startRaw.flatMap { ThingsDate.date(from: $0) } }
 
-    /// Día en el que la tarea ocupa la agenda: el plazo manda si existe.
-    var placement: Date? { deadline ?? scheduled }
+    /// Día en el que la tarea ocupa la agenda. Con las dos fechas presentes gana la
+    /// **anterior**: el día que planeaste trabajarla, no el último día posible.
+    ///
+    /// Antes el plazo eclipsaba a la agenda (`deadline ?? scheduled`) y una tarea
+    /// programada para hoy con plazo mañana solo aparecía mañana, en desacuerdo con
+    /// Things —que la muestra bajo la estrella Today— y con la propia vista Día.
+    /// El plazo no se pierde: la tarjeta pinta su franja roja y un «vence dd/mm».
+    var placement: Date? {
+        switch (scheduled, deadline) {
+        case let (s?, d?): return min(s, d)
+        case let (s?, nil): return s
+        case let (nil, d?): return d
+        default: return nil
+        }
+    }
 
     var hasDate: Bool { placement != nil }
 }
@@ -86,6 +99,7 @@ enum DateFormat {
         time = make("HH:mm:ss")
         iso = make("yyyy-MM-dd", posix: true)
         hm = make("HH:mm")
+        dueShort = make("dd/MM", posix: true)
         dayTitle = make(en ? "EEEE, MMMM d, yyyy" : "EEEE d 'de' MMMM yyyy")
     }
 
@@ -96,6 +110,8 @@ enum DateFormat {
     static var time = make("HH:mm:ss")
     static var iso = make("yyyy-MM-dd", posix: true)
     static var hm = make("HH:mm")
+    /// "28/10": el plazo en la tarjeta cuando cae en otro día.
+    static var dueShort = make("dd/MM", posix: true)
     static var dayTitle = make("EEEE d 'de' MMMM yyyy")
 
     /// "lun 26" / "Mon 26"
