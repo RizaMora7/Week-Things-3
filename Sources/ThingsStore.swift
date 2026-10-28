@@ -191,6 +191,15 @@ final class ThingsStore {
             return Calendar.current.startOfDay(for: p) < today
         }.count
         board.counts.undated = board.counts.open - board.counts.dated
+        board.authToken = readAuthToken(db)
+    }
+
+    /// Token del esquema de URL. Se tolera su ausencia (la base del modo demo no
+    /// tiene `TMSettings`): sin token, la acción Completar avisa en vez de fallar.
+    private func readAuthToken(_ db: SQLiteDB) -> String? {
+        guard let rows = try? db.rows("SELECT uriSchemeAuthenticationToken AS t FROM TMSettings LIMIT 1"),
+              let token = rows.first?.str("t"), !token.isEmpty else { return nil }
+        return token
     }
 
     private func readTasks(_ db: SQLiteDB) throws -> [TaskItem] {
@@ -270,5 +279,24 @@ final class ThingsStore {
     // MARK: - Acciones por esquema de URL (nunca escribimos en la base)
 
     static func showURL(uuid: String) -> URL? { URL(string: "things:///show?id=\(uuid)") }
-    static func completeURL(uuid: String) -> URL? { URL(string: "things:///complete?id=\(uuid)") }
+
+    /// `things:///complete` no existe en el esquema oficial: completar es `update`
+    /// (o `update-project`) con `completed=true` y el token de autorización.
+    static func completeURL(item: TaskItem, authToken: String) -> URL? {
+        var c = URLComponents()
+        c.scheme = "things"
+        c.host = ""
+        c.path = item.isProject ? "/update-project" : "/update"
+        // Codificación estricta: URLComponents deja pasar '+', que el receptor puede
+        // leer como espacio y romper el token.
+        let unreserved = CharacterSet(charactersIn:
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        func enc(_ s: String) -> String { s.addingPercentEncoding(withAllowedCharacters: unreserved) ?? s }
+        c.percentEncodedQueryItems = [
+            URLQueryItem(name: "id", value: enc(item.id)),
+            URLQueryItem(name: "completed", value: "true"),
+            URLQueryItem(name: "auth-token", value: enc(authToken)),
+        ]
+        return c.url
+    }
 }

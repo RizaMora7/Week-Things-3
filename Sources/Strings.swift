@@ -301,6 +301,15 @@ enum L {
         // MARK: menú contextual de tarjetas
         "ctx.open":         ("Abrir en Things", "Open in Things"),
         "ctx.complete":     ("Completar", "Complete"),
+        "ctx.completeRecurring": ("Things no permite completar tareas repetitivas desde otra app. " +
+                                  "Complétala en Things.",
+                                  "Things doesn't let other apps complete repeating to-dos. " +
+                                  "Complete it in Things."),
+        "alert.token.title": ("Things no tiene activadas sus URL", "Things URLs aren't enabled"),
+        "alert.token.body": ("Para completar tareas desde Semana, activa en Things: Ajustes → General → " +
+                             "Activar URL de Things. Luego recarga el tablero.",
+                             "To complete to-dos from Semana, enable it in Things: Settings → General → " +
+                             "Enable Things URLs. Then reload the board."),
         "ctx.copyTitle":    ("Copiar título", "Copy title"),
         "ctx.copyUUID":     ("Copiar UUID", "Copy UUID"),
         "ctx.show":         ("Mostrar en Things", "Show in Things"),
@@ -313,6 +322,8 @@ enum L {
         "cal.suffix":       ("  ·  %@", "  ·  %@"),
         "cal.provider.local":      ("En este Mac", "On this Mac"),
         "cal.provider.subscribed": ("Suscritos", "Subscribed"),
+        "cal.provider.other":      ("Otros", "Other"),
+        "cal.section.noise":       ("Sugerencias y sistema", "Suggestions & system"),
 
         // MARK: errores y avisos
         "err.notFound":     ("No encontré la base de Things 3. ¿Está instalado y con datos?",

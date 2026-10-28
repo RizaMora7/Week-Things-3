@@ -49,6 +49,9 @@ struct Board {
     var databasePath = ""
     var readMode = "—"
     var counts = Counts()
+    /// Token de autorización del esquema de URL de Things (`TMSettings`). Lo exige
+    /// `things:///update`; nil si Things no lo tiene o la base no trae la tabla.
+    var authToken: String?
 
     struct Counts {
         var open = 0

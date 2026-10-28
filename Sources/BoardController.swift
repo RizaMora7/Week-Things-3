@@ -687,54 +687,34 @@ final class BoardController: NSObject, NSWindowDelegate {
         render()
     }
 
-    /// Menú de calendarios con checkboxes; se guarda la selección por título.
+    private var calendarPopover: NSPopover?
+    private var calendarReload: DispatchWorkItem?
+
+    /// Selector de calendarios (popover que sigue abierto al marcar); se guarda la
+    /// selección por título.
     @objc func showCalendarMenu() {
+        if let open = calendarPopover, open.isShown { open.performClose(nil); return }
         if calendars.isEmpty { calendars = CalendarStore.availableCalendars() }
-        let enabled = Set(calendars.filter { $0.enabled }.map { $0.title })
-        let menu = NSMenu()
-        menu.addItem(withTitle: L.s("cal.all"), action: #selector(calSelectAll), keyEquivalent: "").target = self
-        menu.addItem(withTitle: L.s("cal.mine"), action: #selector(calSelectMine), keyEquivalent: "").target = self
-        menu.addItem(withTitle: L.s("cal.none"), action: #selector(calSelectNone), keyEquivalent: "").target = self
-        menu.addItem(.separator())
-        for c in calendars {
-            // El proveedor (iCloud, Google, …) va en el texto: hay calendarios con el
-            // mismo título en cuentas distintas.
-            let prov = CalendarStore.providerLabel(c.provider)
-            let shown = prov.isEmpty ? c.title : "\(c.title)  ·  \(prov)"
-            let it = NSMenuItem(title: shown, action: #selector(calToggle(_:)), keyEquivalent: "")
-            it.target = self
-            it.representedObject = c.title
-            it.state = enabled.contains(c.title) ? .on : .off
-            menu.addItem(it)
+        let picker = CalendarPicker(calendars: calendars) { [weak self] titles in
+            self?.applySelection(titles: titles)
         }
-        let rect = calendarsButton.bounds
-        menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: rect.maxY + 4), in: calendarsButton)
+        let pop = NSPopover()
+        pop.behavior = .transient
+        pop.contentViewController = picker
+        pop.appearance = window.appearance
+        calendarPopover = pop
+        pop.show(relativeTo: calendarsButton.bounds, of: calendarsButton, preferredEdge: .minY)
     }
 
-    @objc private func calToggle(_ sender: NSMenuItem) {
-        guard let title = sender.representedObject as? String else { return }
-        var current = Set(calendars.filter { $0.enabled }.map { $0.title })
-        if current.contains(title) { current.remove(title) } else { current.insert(title) }
-        applySelection(titles: Array(current))
-    }
-
-    @objc private func calSelectAll() {
-        applySelection(titles: calendars.map { $0.title })
-    }
-
-    @objc private func calSelectNone() {
-        applySelection(titles: [])
-    }
-
-    @objc private func calSelectMine() {
-        applySelection(titles: calendars.filter { !CalendarStore.isNoise($0.title) }.map { $0.title })
-    }
-
-    private func applySelection(titles: [String]) {
-        let set = Set(titles)
-        for i in calendars.indices { calendars[i].enabled = set.contains(calendars[i].title) }
-        Prefs.shared.enabledCalendars = Array(set).sorted()
-        reloadNow()
+    /// Guarda al instante y recarga tras una breve pausa, para no releer las bases en
+    /// cada casilla cuando se marcan varias seguidas.
+    private func applySelection(titles: Set<String>) {
+        for i in calendars.indices { calendars[i].enabled = titles.contains(calendars[i].title) }
+        Prefs.shared.enabledCalendars = Array(titles).sorted()
+        calendarReload?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.reloadNow() }
+        calendarReload = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
     }
 
     private func syncCalendarSelection() {
@@ -852,7 +832,17 @@ final class BoardController: NSObject, NSWindowDelegate {
     }
 
     private func completeItem(_ item: TaskItem) {
-        guard let url = ThingsStore.completeURL(uuid: item.id) else { return }
+        // Things rechaza `completed` en repetitivas; el menú ya lo desactiva, esto es la red.
+        guard !item.recurring else { return }
+        guard let token = board.authToken else {
+            let a = NSAlert()
+            a.messageText = L.s("alert.token.title")
+            a.informativeText = L.s("alert.token.body")
+            a.addButton(withTitle: L.s("alert.ok"))
+            a.runModal()
+            return
+        }
+        guard let url = ThingsStore.completeURL(item: item, authToken: token) else { return }
         NSWorkspace.shared.open(url)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in self?.reloadNow() }
     }
@@ -863,7 +853,13 @@ final class BoardController: NSObject, NSWindowDelegate {
         menuTarget = item
         let m = NSMenu()
         m.addItem(withTitle: L.s("ctx.open"), action: #selector(menuOpen), keyEquivalent: "").target = self
-        m.addItem(withTitle: L.s("ctx.complete"), action: #selector(menuComplete), keyEquivalent: "").target = self
+        let complete = m.addItem(withTitle: L.s("ctx.complete"), action: #selector(menuComplete), keyEquivalent: "")
+        complete.target = self
+        if item.recurring {
+            m.autoenablesItems = false
+            complete.isEnabled = false
+            complete.toolTip = L.s("ctx.completeRecurring")
+        }
         m.addItem(.separator())
         m.addItem(withTitle: L.s("ctx.copyTitle"), action: #selector(menuCopyTitle), keyEquivalent: "").target = self
         m.addItem(withTitle: L.s("ctx.copyUUID"), action: #selector(menuCopyUUID), keyEquivalent: "").target = self

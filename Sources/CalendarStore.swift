@@ -37,6 +37,7 @@ struct CalSource: Identifiable, Equatable {
     /// pasar por `providerLabel`.
     let provider: String
     var enabled: Bool
+    var color: NSColor = .systemGray
     var id: Int { rowID }
 }
 
@@ -93,6 +94,8 @@ enum CalendarStore {
             // Placeholders internos de Calendar ("DEFAULT_CALENDAR_NAME", ...): nunca
             // traen eventos del usuario, así que ni se ofrecen en el selector.
             if title.hasPrefix("DEFAULT_") { continue }
+            // Lo mismo con el calendario "Default" del almacén Default de Apple.
+            if title == "Default" && (r.str("store") ?? "") == "Default" { continue }
             // Un mismo título puede aparecer en tres filas (iCloud/Google/Otros) cuando
             // la cuenta se registró con el correo: se distinguen por rowid, pero el
             // usuario elige por título.
@@ -100,7 +103,8 @@ enum CalendarStore {
             if seenTitles.contains(title) && noise { continue }
             seenTitles.insert(title)
             out.append(CalSource(rowID: rid, title: title, provider: r.str("store") ?? "",
-                                 enabled: !noise))
+                                 enabled: !noise,
+                                 color: parseHex(r.str("color")) ?? .systemGray))
         }
         return out
     }

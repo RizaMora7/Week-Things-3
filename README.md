@@ -57,8 +57,15 @@ para crear, abrir, completar o cancelar. Por eso la app lee la base SQLite de Th
 
 La barra de estado dice en cada momento qué ruta se usó.
 
-Acciones: **Abrir en Things** y **Completar** salen por el esquema de URL oficial.
-Nada en la app modifica tu biblioteca directamente.
+Acciones: **Abrir en Things** y **Completar** salen por el esquema de URL oficial
+(`things:///show` y `things:///update?completed=true`). Nada en la app modifica tu
+biblioteca directamente: es Things quien aplica el cambio.
+
+`update` exige el token de autorización de Things. Semana lo lee de la tabla `TMSettings`
+de la misma base, así que no hay que copiarlo a mano; basta con tener activado
+*Things → Ajustes → General → Activar URL de Things*. Si no lo está, Completar avisa en vez
+de fallar en silencio. Las tareas **repetitivas** no se pueden completar desde fuera
+(limitación del esquema de Things), así que la opción aparece desactivada en ellas.
 
 ### El formato de fechas (no es un epoch)
 
