@@ -1,6 +1,6 @@
 import Foundation
 
-/// Los seis marcos que ofrece la vista diaria.
+/// The six frameworks offered by the daily view.
 enum PlanFramework: Int, CaseIterable {
     case eisenhower = 0
     case timeBlock = 1
@@ -31,7 +31,7 @@ enum PlanFramework: Int, CaseIterable {
         }
     }
 
-    /// Una línea honesta sobre qué decide cada marco y con qué señal.
+    /// One honest line about what each framework decides and from which signal.
     var explainer: String {
         switch self {
         case .eisenhower: return L.s("fx.eisenhower")
@@ -78,7 +78,7 @@ enum Moscow: Int, CaseIterable {
     }
 }
 
-/// Un tramo del día.
+/// A slice of the day.
 struct PlanBlock {
     enum Kind: Int, CaseIterable { case calendar, deep, admin, lowEnergy, buffer, rest
         var label: String {
@@ -100,7 +100,7 @@ struct PlanBlock {
     var minutes: Int { Int(end.timeIntervalSince(start) / 60) }
 }
 
-/// Resultado de aplicar un marco a un día.
+/// Result of applying a framework to a day.
 struct DayPlan {
     let framework: PlanFramework
     let day: Date
@@ -118,16 +118,16 @@ struct DayPlan {
     var demandMinutes = 0
 }
 
-/// Motor del plan diario. Toda la lógica de priorización vive aquí; la vista solo pinta.
+/// Daily plan engine. All prioritisation logic lives here; the view only draws.
 enum Planner {
     static let calendar = Calendar.current
 
-    // MARK: señales
+    // MARK: signals
 
-    /// Esfuerzo estimado en minutos, deducido (no inventado):
-    /// 1) tiempo escrito en el título o la nota ("25 min", "1h30", "60 min");
-    /// 2) número de ítems de checklist a 10 min, mínimo 15;
-    /// 3) respaldo por tag: High 45, Medium 30, Low 15.
+    /// Estimated effort in minutes, inferred (not invented):
+    /// 1) time written in the title or notes ("25 min", "1h30", "60 min");
+    /// 2) number of checklist items × 10 min, minimum 15;
+    /// 3) fallback by tag: High 45, Medium 30, Low 15.
     static func estimate(_ t: TaskItem) -> Int {
         if let m = parseDuration(t.title) ?? parseDuration(t.notes) { return m }
         if t.totalChecklist > 0 { return max(15, min(180, t.totalChecklist * 10)) }
@@ -166,8 +166,8 @@ enum Planner {
         return nil
     }
 
-    /// "Gestión del pipeline · 15 min" → "Gestión del pipeline". El timeline ya
-    /// imprime los minutos del bloque, así que la duración del título sobra.
+    /// "Gestión del pipeline · 15 min" → "Gestión del pipeline". The timeline already
+    /// prints the block's minutes, so the duration in the title is redundant.
     static func cleanTitle(_ raw: String) -> String {
         let pattern = "[\\s(\\[·,\\-–—]*\\d+\\s*(?:mins?\\.?|minutos?|hrs?|horas?)\\s*[\\)\\]]?\\s*$"
         guard let re = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else { return raw }
@@ -182,7 +182,7 @@ enum Planner {
         return s.isEmpty || !bracketsBalanced(s) ? raw : s
     }
 
-    /// "(Vie 15 min)" recortado a "(Vie" es peor que no recortar nada.
+    /// "(Vie 15 min)" trimmed to "(Vie" is worse than not trimming at all.
     static func bracketsBalanced(_ s: String) -> Bool {
         var round = 0, square = 0
         for ch in s {
@@ -198,12 +198,12 @@ enum Planner {
         return round == 0 && square == 0
     }
 
-    /// Urgencia: el tag `Urgent`, un plazo que ya venció o cae a más tardar mañana, o una
-    /// fecha programada que pasó y sigue abierta (Things la arrastra a Hoy).
+    /// Urgency: the `Urgent` tag, a deadline that has passed or falls tomorrow at the latest, or a
+    /// scheduled date that has passed and is still open (Things carries it to Today).
     ///
-    /// Ampliada el 2026-10-27. Con solo «plazo hoy o vencido» el eje estaba muerto en este
-    /// proyecto: casi no se usan deadlines y el tag `Urgent` aparece poco, así que Q1 y Q3
-    /// quedaban vacíos siempre y la matriz degeneraba en un solo eje.
+    /// Widened on 2026-10-27. With only «deadline today or overdue» the axis was dead in this
+    /// project: deadlines are rarely used and the `Urgent` tag shows up rarely, so Q1 and Q3
+    /// were always empty and the matrix collapsed into a single axis.
     static func isUrgent(_ t: TaskItem, day: Date) -> Bool {
         if t.tags.contains("Urgent") { return true }
         let today = calendar.startOfDay(for: day)
@@ -213,20 +213,20 @@ enum Planner {
         return false
     }
 
-    /// Importancia según la misma escalera que usan las tareas agendadas de QwenWork:
-    /// `Important` y `High` importan; `Medium`, `Low` o ninguna etiqueta, no.
+    /// Importance follows the same ladder used by QwenWork's scheduled tasks:
+    /// `Important` and `High` matter; `Medium`, `Low` or no tag don't.
     ///
-    /// Antes bastaba con `Medium`, o con que la fila fuera un proyecto. Eso se escribió
-    /// cuando en este proyecto solo existían Low/Medium/High y tratar Medium como
-    /// «no importante» vaciaba la matriz. Desde que hay etiquetas `Important`, ese
-    /// compromiso borraba la diferencia: `Important` no decidía el cuadrante de nada.
-    /// Un proyecto solo puntúa si él mismo trae `Important` o `High`.
+    /// It used to be enough to have `Medium`, or for the row to be a project. That was written
+    /// when this project only had Low/Medium/High and treating Medium as
+    /// «not important» emptied the matrix. Once `Important` tags existed, that
+    /// compromise erased the difference: `Important` didn't decide anything's quadrant.
+    /// A project only scores if it carries `Important` or `High` itself.
     static func isImportant(_ t: TaskItem) -> Bool {
         return t.tags.contains("Important") || t.tags.contains("High")
     }
 
-    /// Escalera de prioridad por etiqueta, en el orden que se pidió:
-    /// Important › Urgent › High › Medium › Low › sin etiqueta.
+    /// Priority ladder by tag, in the requested order:
+    /// Important › Urgent › High › Medium › Low › untagged.
     static func priorityRank(_ t: TaskItem) -> Int {
         if t.tags.contains("Important") { return 0 }
         if t.tags.contains("Urgent") { return 1 }
@@ -236,8 +236,8 @@ enum Planner {
         return 5
     }
 
-    /// La etiqueta de la escalera que posiciona a la tarea, tal como está escrita en
-    /// Things. `nil` si no trae ninguna (entonces el orden lo deciden plazo y estimado).
+    /// The ladder tag that ranks the task, exactly as written in
+    /// Things. `nil` if it has none (then deadline and estimate decide the order).
     static func priorityTag(_ t: TaskItem) -> String? {
         for name in ["Important", "Urgent", "High", "Medium", "Low"] where t.tags.contains(name) {
             return name
@@ -245,8 +245,8 @@ enum Planner {
         return nil
     }
 
-    /// Orden canónico de la app: prioridad de etiqueta primero, luego urgencia real
-    /// (un vencido de etiqueta baja manda sobre un sin etiqueta), luego lo rápido.
+    /// The app's canonical order: tag priority first, then real urgency
+    /// (an overdue low-tag item beats an untagged one), then the quick ones.
     static func byPriority(_ a: TaskItem, _ b: TaskItem, day: Date) -> Bool {
         let ra = priorityRank(a), rb = priorityRank(b)
         if ra != rb { return ra < rb }
@@ -267,12 +267,12 @@ enum Planner {
         return max(0, d)
     }
 
-    /// ¿Pertenece esta tarea al plan de ese día? Con basta una de las dos señales:
-    /// agenda en ese día o antes, o plazo en ese día o antes.
+    /// Does this task belong to that day's plan? Either signal is enough:
+    /// scheduled on or before that day, or deadline on or before that day.
     ///
-    /// Corregido el 2026-10-27: antes el plazo tenía prioridad y hacía `return`, así que
-    /// una tarea agendada para hoy con plazo mañana quedaba fuera del plan de hoy. Es el
-    /// caso de la única `Important` del día, que desaparecía y dejaba Q1 vacío.
+    /// Fixed on 2026-10-27: the deadline used to take precedence and `return`, so
+    /// a task scheduled for today with a deadline tomorrow was left out of today's plan. That's
+    /// the case of the day's only `Important`, which vanished and left Q1 empty.
     static func isRelevant(_ t: TaskItem, day: Date) -> Bool {
         let dayStart = calendar.startOfDay(for: day)
         if let dl = t.deadline, calendar.startOfDay(for: dl) <= dayStart { return true }
@@ -280,10 +280,10 @@ enum Planner {
         return false
     }
 
-    // MARK: construcción
+    // MARK: construction
 
-    /// Construye el plan del día. `tasks` deben ser las que caen en ese día
-    /// (plazo o agenda), más las atrasadas si `includeOverdue`.
+    /// Builds the day's plan. `tasks` must be the ones that fall on that day
+    /// (deadline or schedule), plus overdue ones if `includeOverdue`.
     static func build(framework: PlanFramework, day: Date, tasks: [TaskItem],
                       events: [CalEvent], includeOverdue: Bool) -> DayPlan {
         var plan = DayPlan(framework: framework, day: day)
@@ -301,19 +301,19 @@ enum Planner {
             plan.quadrants[q, default: []].append(t)
         }
 
-        // Frog y victorias rápidas
+        // Frog and quick wins
         plan.frog = sortedAll.first { isImportant($0) && estimate($0) >= 45 } ?? sortedAll.first
         plan.quickWins = sortedAll.filter { estimate($0) <= 5 && $0.id != plan.frog?.id }.prefix(5).map { $0 }
 
         // Pareto Top-3
         plan.top3 = Array(sortedAll.prefix(3))
 
-        // Capacidad: jornada 08:00–18:00 menos lo ocupado en el calendario.
+        // Capacity: 08:00–18:00 working day minus what the calendar already takes.
         let busy = busyMinutes(events, day: dayStart)
-        plan.capacityMinutes = max(60, 600 - busy - 60)     // 60 min de pausas reglamentarias
+        plan.capacityMinutes = max(60, 600 - busy - 60)     // 60 min of statutory breaks
         plan.demandMinutes = sortedAll.reduce(0) { $0 + estimate($1) }
 
-        // MoSCoW: alcance contra la capacidad real del día, no un espejo de urgencia.
+        // MoSCoW: scope against the day's real capacity, not a mirror of urgency.
         var must: [TaskItem] = [], should: [TaskItem] = [], could: [TaskItem] = [], wont: [TaskItem] = []
         let mustLine = Int(Double(plan.capacityMinutes) * 0.55)
         let shouldLine = Int(Double(plan.capacityMinutes) * 0.85)
@@ -347,7 +347,7 @@ enum Planner {
         return plan
     }
 
-    /// Orden de ejecución según el marco elegido.
+    /// Execution order for the chosen framework.
     private static func orderedFor(_ fw: PlanFramework, _ plan: DayPlan, _ base: [TaskItem]) -> [TaskItem] {
         switch fw {
         case .frog:
@@ -368,7 +368,7 @@ enum Planner {
             return (plan.quadrants[.q1] ?? []) + (plan.quadrants[.q2] ?? [])
                  + (plan.quadrants[.q3] ?? []) + (plan.quadrants[.q4] ?? [])
         case .timeBlock:
-            // Aquí manda el tamaño: grande en foco profundo, mediana administrativa, chica al final.
+            // Size rules here: big ones in deep focus, medium ones admin, small ones last.
             return base.sorted { a, b in
                 let ea = estimate(a), eb = estimate(b)
                 if isImportant(a) != isImportant(b) { return isImportant(a) }
@@ -387,7 +387,7 @@ enum Planner {
         }
     }
 
-    /// Timeline 08:00–18:00 respetando el calendario, con bloques por tipo de energía.
+    /// 08:00–18:00 timeline respecting the calendar, with blocks by energy type.
     private static func makeBlocks(framework: PlanFramework, day: Date, ordered: [TaskItem],
                                    events: [CalEvent], includeOverdue: Bool) -> [PlanBlock] {
         var blocks: [PlanBlock] = []
@@ -395,7 +395,7 @@ enum Planner {
         let windowEnd = calendar.date(byAdding: .hour, value: 18, to: day)!
         let dayEndRef = calendar.startOfDay(for: day)
 
-        // 1) Los eventos reales mandan.
+        // 1) Real events come first.
         for e in events where !e.allDay {
             guard let s = e.start, let en = e.end else { continue }
             let clippedStart = max(s, windowStart)
@@ -421,7 +421,7 @@ enum Planner {
             return nil
         }
 
-        // 2) Pausa de comida: fija a las 13:00, y solo si ese tramo está libre.
+        // 2) Lunch break: fixed at 13:00, and only if that slot is free.
         let lunchStart = calendar.date(byAdding: .hour, value: 13, to: day)!
         let lunchEnd = lunchStart.addingTimeInterval(3600)
         if lunchEnd <= windowEnd && !occupied(lunchStart, lunchEnd) {
@@ -429,7 +429,7 @@ enum Planner {
                                     title: L.s("b.longBreak"), items: []))
         }
 
-        // 3) Tareas a bloques.
+        // 3) Tasks into blocks.
         var deepRun = 0
         for t in ordered {
             let est = estimate(t)

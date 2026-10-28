@@ -1,20 +1,20 @@
 import Foundation
 
-/// Codificación de fechas de Things 3.
+/// Things 3 date encoding.
 ///
-/// Things NO guarda fechas como epoch: usa un entero con bits empaquetados
-/// `YYYYYYYYYYYMMMMDDDDD0000000` (año, mes, día y 7 bits bajos sin usar).
-/// Por eso un "día extra" aparece en cada cambio de mes, y cualquier intento
-/// de tratar el valor como segundos o días desde 1970 deriva.
+/// Things does NOT store dates as an epoch: it uses an integer with packed bits
+/// `YYYYYYYYYYYMMMMDDDDD0000000` (year, month, day and 7 unused low bits).
+/// That's why an "extra day" shows up at every month boundary, and any attempt
+/// to treat the value as seconds or days since 1970 drifts.
 ///
-/// Máscaras verificadas contra la librería `things-py` (la que usa el MCP de
-/// Things instalado) y contra 8 fechas leídas desde la propia UI de Things.
+/// Masks verified against the `things-py` library (the one used by the installed
+/// Things MCP) and against 8 dates read from Things' own UI.
 enum ThingsDate {
     static let yearMask = 0b111111111110000000000000000
     static let monthMask = 0b000000000001111000000000000
     static let dayMask = 0b000000000000000111110000000
 
-    /// Decodifica un valor de Things a fecha local. `nil` si está ausente o es inválida.
+    /// Decodes a Things value to a local date. `nil` if missing or invalid.
     static func components(from value: Int) -> DateComponents? {
         guard value != 0 else { return nil }
         let year = (value & yearMask) >> 16
@@ -25,7 +25,7 @@ enum ThingsDate {
         c.year = year
         c.month = month
         c.day = day
-        c.hour = 12              // mediodía: inmune a cambios de hora al restar días
+        c.hour = 12              // noon: immune to DST changes when subtracting days
         c.calendar = Calendar(identifier: .gregorian)
         return c
     }
@@ -35,7 +35,7 @@ enum ThingsDate {
         return c.calendar?.date(from: c)
     }
 
-    /// Diferencia en días calendario entre el valor de Things y una fecha de referencia.
+    /// Difference in calendar days between the Things value and a reference date.
     static func dayOffset(_ value: Int, from reference: Date, calendar: Calendar = .current) -> Int? {
         guard let d = date(from: value) else { return nil }
         return calendar.dateComponents([.day], from: calendar.startOfDay(for: reference),
@@ -43,7 +43,7 @@ enum ThingsDate {
     }
 }
 
-/// Etiqueta corta del bucket de inicio de Things.
+/// Short label for Things' start bucket.
 enum StartBucket: Int {
     case inbox = 0
     case anytime = 1

@@ -5,8 +5,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var controller: BoardController?
     private var loginMenuItem: NSMenuItem?
 
-    /// ítem + clave para re-titular todo cuando cambia el idioma sin rehacer el menú
-    /// (rehacerlo desde una acción de menú mientras el menú está abierto es inestable).
+    /// item + key, so everything can be retitled when the language changes without rebuilding the menu
+    /// (rebuilding it from a menu action while the menu is open is unstable).
     private var titledItems: [(NSMenuItem, String)] = []
     private var submenuTitles: [(NSMenu, String)] = []
     private var themeItems: [NSMenuItem] = []
@@ -35,14 +35,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    // MARK: - Menú principal
+    // MARK: - Main menu
 
     private func buildMenu() {
         let mainMenu = NSMenu()
         titledItems.removeAll()
         submenuTitles.removeAll()
 
-        // Aplicación
+        // Application
         let appItem = NSMenuItem()
         mainMenu.addItem(appItem)
         let appMenu = NSMenu()
@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(.separator())
         addItem(appMenu, "menu.quit", #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 
-        // Semana
+        // Week
         let weekItem = NSMenuItem()
         mainMenu.addItem(weekItem)
         let weekMenu = NSMenu()
@@ -75,7 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         weekMenu.addItem(.separator())
         addItem(weekMenu, "menu.calendars", #selector(BoardController.showCalendarMenu)).target = controller
 
-        // Vista
+        // View
         let viewItem = NSMenuItem()
         mainMenu.addItem(viewItem)
         let viewMenu = NSMenu()
@@ -114,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             langItems.append(it)
         }
 
-        // Edición (necesario para escribir en el buscador y para ⌘C del menú contextual)
+        // Edit (needed to type in the search field and for ⌘C in the context menu)
         let editItem = NSMenuItem()
         mainMenu.addItem(editItem)
         let editMenu = NSMenu()
@@ -125,7 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         editMenu.addItem(withTitle: L.s("menu.paste"), action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         editMenu.addItem(withTitle: L.s("menu.selectAll"), action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
-        // Ventana
+        // Window
         let windowItem = NSMenuItem()
         mainMenu.addItem(windowItem)
         let windowMenu = NSMenu()
@@ -139,7 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshTitles()
     }
 
-    /// Crea un ítem con título traducido y lo queda registrado para re-titularlo.
+    /// Creates an item with a translated title and registers it so it can be retitled.
     @discardableResult
     private func addItem(_ menu: NSMenu, _ key: String, _ action: Selector?, keyEquivalent: String = "") -> NSMenuItem {
         let it = NSMenuItem(title: L.s(key), action: action, keyEquivalent: keyEquivalent)
@@ -152,7 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         titledItems.append((item, key))
     }
 
-    /// Re-titula el menú en el idioma activo. Se llama también al cambiar de idioma.
+    /// Retitles the menu in the active language. Also called when the language changes.
     func refreshTitles() {
         for (item, key) in titledItems { item.title = L.s(key) }
         for (menu, key) in submenuTitles { menu.title = L.s(key) }

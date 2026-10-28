@@ -1,18 +1,18 @@
 import Foundation
 
-/// Lee Things 3 sin escribir nunca en su base.
+/// Reads Things 3 without ever writing to its database.
 ///
-/// Dos rutas, en este orden:
-/// 1. **Base viva en modo solo lectura** (`SQLITE_OPEN_READONLY`). SQLite atiende la
-///    lectura por MVCC desde el WAL: no bloquea a Things ni modifica nada. Es la misma
-///    vía que usa el MCP de Things instalado, y evita copiar 31 MB en cada refresco.
-/// 2. **Espejo temporal** (`main.sqlite` + `-wal` + `-shm` copiados a un directorio
-///    propio), validado con `PRAGMA quick_check` antes de fiarnos de él. La copia se
-///    abre en lectura-escritura *solo sobre la copia*, para que SQLite pueda rehacer
-///    su índice WAL si hace falta.
+/// Two paths, in this order:
+/// 1. **Live database in read-only mode** (`SQLITE_OPEN_READONLY`). SQLite serves the
+///    read via MVCC from the WAL: it doesn't block Things or modify anything. It's the same
+///    path the installed Things MCP uses, and it avoids copying 31 MB on every refresh.
+/// 2. **Temporary mirror** (`main.sqlite` + `-wal` + `-shm` copied to a directory of
+///    our own), validated with `PRAGMA quick_check` before trusting it. The copy is
+///    opened read-write *on the copy only*, so SQLite can rebuild
+///    its WAL index if needed.
 ///
-/// En ningún caso se abre la base original con un handle de escritura. Las acciones
-/// (abrir, completar) se delegan al esquema de URL oficial de Things.
+/// The original database is never opened with a write handle. Actions
+/// (open, complete) are delegated to Things' official URL scheme.
 final class ThingsStore {
     enum StoreError: LocalizedError {
         case notFound
@@ -38,23 +38,23 @@ final class ThingsStore {
     private var cachedSourceURL: URL?
     private var cacheDate = Date.distantPast
 
-    /// Aviso no fatal (por ejemplo, falta de permisos) que la UI muestra.
+    /// Non-fatal notice (e.g. missing permissions) shown by the UI.
     private(set) var lastNotice: String?
-    /// Modo de lectura usado en la última instantánea: token "live" / "mirror" que la
-    /// UI traduce. Es independiente del idioma de la interfaz.
+    /// Read mode used for the last snapshot: a "live" / "mirror" token that the
+    /// UI translates. Independent of the interface language.
     private(set) var lastReadMode: String = "—"
 
-    // MARK: - Descubrimiento de la base
+    // MARK: - Database discovery
 
-    /// Busca `main.sqlite` bajo el group container. Prefiere el layout moderno
-    /// `ThingsData-XXXX/…` y, entre iguales, la copia modificada más reciente.
-    /// Caminada manual a propósito: un rechazo de permisos debe distinguirse de
-    /// "la base no existe", para no reportar un FDA ausente como biblioteca perdida.
+    /// Looks for `main.sqlite` under the group container. Prefers the modern
+    /// `ThingsData-XXXX/…` layout and, among equals, the most recently modified copy.
+    /// Walked by hand on purpose: a permission denial must be told apart from
+    /// "the database doesn't exist", so a missing FDA isn't reported as a lost library.
     func locateDatabase() -> URL? {
-        // `SEMANA_THINGS_DB` permite apuntar a otra base (el modo demo del repo, o
-        // una copia para pruebas). Si el archivo no existe, se ignora y se sigue con
-        // el descubrimiento normal: una ruta mal escrita no debe parecer "Things no
-        // está instalado".
+        // `SEMANA_THINGS_DB` lets you point at another database (the repo's demo mode, or
+        // a copy for testing). If the file doesn't exist it's ignored and normal
+        // discovery continues: a mistyped path shouldn't look like "Things isn't
+        // installed".
         if let override = ProcessInfo.processInfo.environment["SEMANA_THINGS_DB"],
            !override.isEmpty, fm.fileExists(atPath: override) {
             return URL(fileURLWithPath: override)
@@ -94,8 +94,7 @@ final class ThingsStore {
         cachedSourceURL = ranked.first
         cacheDate = Date()
         if ranked.first == nil && permissionDenied {
-            lastNotice = "macOS bloqueó el acceso a la base de Things. Concede Acceso Total al Disco a «Semana» " +
-                "(Ajustes del Sistema → Privacidad y seguridad → Acceso Total al Disco) y reinicia la app."
+            lastNotice = L.s("err.fdaBlocked")
         }
         return ranked.first
     }
@@ -104,13 +103,13 @@ final class ThingsStore {
         ((try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate) ?? .distantPast
     }
 
-    /// Modificación de la base original: permite saltarse refrescos sin cambios.
+    /// Modification date of the original database: lets unchanged refreshes be skipped.
     func sourceModificationDate() -> Date? {
         guard let url = locateDatabase() else { return nil }
         return modificationDate(url)
     }
 
-    // MARK: - Instantánea
+    // MARK: - Snapshot
 
     func snapshot() -> Result<Board, StoreError> {
         guard let source = locateDatabase() else { return .failure(.notFound) }
@@ -154,10 +153,10 @@ final class ThingsStore {
         } catch { return nil }
 
         do {
-            // Lectura-escritura sobre nuestra copia: SQLite puede reconstruir el -shm.
+            // Read-write on our copy: SQLite can rebuild the -shm.
             let db = try SQLiteDB(path: copy.path)
             let check = try db.rows("PRAGMA quick_check")
-            guard firstValue(check) == "ok" else { return nil }   // espejo roto: no lo mostramos
+            guard firstValue(check) == "ok" else { return nil }   // broken mirror: don't show it
             var board = Board()
             board.databasePath = source.path
             lastReadMode = "mirror"
@@ -168,14 +167,14 @@ final class ThingsStore {
         }
     }
 
-    /// Primer valor textual de la primera fila (para `PRAGMA quick_check`).
+    /// First text value of the first row (for `PRAGMA quick_check`).
     private func firstValue(_ rows: [[String: Any?]]) -> String? {
         guard let row = rows.first else { return nil }
         for (_, v) in row { if let s = v as? String { return s } }
         return nil
     }
 
-    // MARK: - Relleno del tablero
+    // MARK: - Board fill
 
     private func fill(_ board: inout Board, _ db: SQLiteDB) throws {
         board.generatedAt = Date()
@@ -194,8 +193,8 @@ final class ThingsStore {
         board.authToken = readAuthToken(db)
     }
 
-    /// Token del esquema de URL. Se tolera su ausencia (la base del modo demo no
-    /// tiene `TMSettings`): sin token, la acción Completar avisa en vez de fallar.
+    /// URL-scheme token. Its absence is tolerated (the demo database has no
+    /// `TMSettings`): without a token, the Complete action warns instead of failing.
     private func readAuthToken(_ db: SQLiteDB) -> String? {
         guard let rows = try? db.rows("SELECT uriSchemeAuthenticationToken AS t FROM TMSettings LIMIT 1"),
               let token = rows.first?.str("t"), !token.isEmpty else { return nil }
@@ -242,11 +241,11 @@ final class ThingsStore {
         for r in rows {
             let recurring = (r.intg("recurring") ?? 0) == 1
             let paused = (r.intg("paused") ?? 0) == 1
-            if recurring && paused { continue }        // Things no las muestra
+            if recurring && paused { continue }        // Things doesn't show them
 
             var startRaw = r.intg("startDate")
-            // En las recurrentes, startDate guarda el ancla original; la próxima
-            // ocurrencia real está en rt1_nextInstanceStartDate.
+            // For repeating to-dos, startDate holds the original anchor; the next
+            // real occurrence is in rt1_nextInstanceStartDate.
             if recurring { startRaw = r.intg("nextStart") ?? startRaw }
 
             let rawTags = r.str("tagTitles") ?? ""
@@ -255,7 +254,7 @@ final class ThingsStore {
 
             items.append(TaskItem(
                 id: r.str("uuid") ?? "",
-                title: r.str("title") ?? "(sin título)",
+                title: r.str("title") ?? L.s("task.untitled"),
                 notes: r.str("notes") ?? "",
                 isProject: (r.intg("type") ?? 0) == 1,
                 start: StartBucket(raw: r.intg("start") ?? -1),
@@ -276,19 +275,19 @@ final class ThingsStore {
         return items
     }
 
-    // MARK: - Acciones por esquema de URL (nunca escribimos en la base)
+    // MARK: - URL-scheme actions (we never write to the database)
 
     static func showURL(uuid: String) -> URL? { URL(string: "things:///show?id=\(uuid)") }
 
-    /// `things:///complete` no existe en el esquema oficial: completar es `update`
-    /// (o `update-project`) con `completed=true` y el token de autorización.
+    /// `things:///complete` doesn't exist in the official scheme: completing is `update`
+    /// (or `update-project`) with `completed=true` and the authorization token.
     static func completeURL(item: TaskItem, authToken: String) -> URL? {
         var c = URLComponents()
         c.scheme = "things"
         c.host = ""
         c.path = item.isProject ? "/update-project" : "/update"
-        // Codificación estricta: URLComponents deja pasar '+', que el receptor puede
-        // leer como espacio y romper el token.
+        // Strict encoding: URLComponents lets '+' through, which the receiver may
+        // read as a space, breaking the token.
         let unreserved = CharacterSet(charactersIn:
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
         func enc(_ s: String) -> String { s.addingPercentEncoding(withAllowedCharacters: unreserved) ?? s }

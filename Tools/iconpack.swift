@@ -1,15 +1,15 @@
-// iconpack — saca un icono de una lámina de referencia y lo deja como maestro
-// cuadrado, con esquinas redondeadas y transparencia real (sin el halo de sombra
-// que trae la lámina).
+// iconpack — extracts an icon from a reference sheet and saves it as a square
+// master, with rounded corners and real transparency (without the shadow halo
+// that comes with the sheet).
 //
 //   xcrun swiftc -framework AppKit -o build/iconpack Tools/iconpack.swift
-//   build/iconpack crop  lamina.png maestro.png x0 y0 x1 y1 [radio]
-//   build/iconpack probe lamina.png y0 y1 [xa xb]  // bordes fila por fila
+//   build/iconpack crop  sheet.png master.png x0 y0 x1 y1 [radius]
+//   build/iconpack probe sheet.png y0 y1 [xa xb]  // edges row by row
 //
-// `probe` sirve para acertar el recorte: compara cada píxel con el fondo de la
-// página (muestreado en el borde izquierdo) y reporta dónde empieza a separarse,
-// con dos tolerancias: 0.06 capta también la sombra difusa y 0.30 solo el borde
-// duro del squircle. Con `xa xb` se limita el barrido a la columna de un icono.
+// `probe` helps get the crop right: it compares each pixel with the page
+// background (sampled at the left edge) and reports where it starts to differ,
+// with two tolerances: 0.06 also catches the soft shadow and 0.30 only the
+// squircle's hard edge. With `xa xb` the sweep is limited to one icon's column.
 import AppKit
 import CoreGraphics
 
@@ -39,7 +39,7 @@ if args[1] == "probe" {
     let y0 = max(0, Int(args[3]) ?? 0), y1 = min(H - 1, Int(args[4]) ?? y0)
     let xa = args.count > 5 ? max(0, Int(args[5])!) : 0
     let xb = args.count > 6 ? min(W - 1, Int(args[6])!) : W - 1
-    print("lámina \(W)x\(H)  ventana de columnas \(xa)…\(xb)")
+    print("sheet \(W)x\(H)  column window \(xa)…\(xb)")
     var y = y0
     while y <= y1 {
         let bg = px(max(0, xa - 2), y)
@@ -54,7 +54,7 @@ if args[1] == "probe" {
             if d > 0.06, softR < 0 { softR = x }
             if d > 0.30, hardR < 0 { hardR = x }
         }
-        print(String(format: "y=%4d  suaves %4d…%4d   fuertes %4d…%4d", y, soft, softR, hard, hardR))
+        print(String(format: "y=%4d  soft %4d…%4d   hard %4d…%4d", y, soft, softR, hard, hardR))
         y += max(1, (y1 - y0) / 40)
     }
     exit(0)
@@ -80,9 +80,9 @@ ctx.addPath(CGPath(roundedRect: CGRect(x: 0, y: 0, width: master, height: master
                    cornerWidth: r, cornerHeight: r, transform: nil))
 ctx.clip()
 ctx.interpolationQuality = .high
-// `draw(_:in:)` ya pinta la imagen en pie en un contexto con origen abajo-izquierda,
-// así que no hay que voltear: la fila `y0` de la lámina (contada desde arriba) debe
-// caer en el borde superior del lienzo, que es y = master.
+// `draw(_:in:)` already draws the image upright in a bottom-left-origin context,
+// so no flipping is needed: the sheet's row `y0` (counted from the top) must
+// land on the canvas's top edge, which is y = master.
 ctx.draw(cg, in: CGRect(x: -CGFloat(x0) * scale,
                         y: master - (CGFloat(H) - CGFloat(y0)) * scale,
                         width: CGFloat(W) * scale, height: CGFloat(H) * scale))
@@ -91,4 +91,4 @@ guard let out = ctx.makeImage() else { exit(1) }
 let dst = NSBitmapImageRep(cgImage: out)
 guard let data = dst.representation(using: .png, properties: [:]) else { exit(1) }
 try! data.write(to: URL(fileURLWithPath: outPath))
-print("recorte de \(Int(side)) px de la lámina → \(Int(master)) px con radio \(Int(radiusFrac * 100))% en \(outPath)")
+print("cropped \(Int(side)) px from the sheet → \(Int(master)) px with radius \(Int(radiusFrac * 100))% at \(outPath)")

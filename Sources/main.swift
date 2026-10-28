@@ -1,6 +1,6 @@
 import AppKit
 
-// Único archivo con código de nivel superior (swiftc lo exige en proyectos multi-archivo).
+// The only file with top-level code (swiftc requires this in multi-file projects).
 let app = NSApplication.shared
 let appDelegate = AppDelegate()
 app.delegate = appDelegate

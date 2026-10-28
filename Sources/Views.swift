@@ -1,6 +1,6 @@
 import AppKit
 
-/// Tarjeta de una tarea: banda de color a la izquierda, título y metadatos.
+/// A to-do card: colour band on the left, title and metadata.
 final class TaskCard: NSView {
     private(set) var item: TaskItem?
     var onClick: ((TaskItem) -> Void)?
@@ -95,8 +95,8 @@ final class TaskCard: NSView {
             parts.append("✓ \(done)/\(i.totalChecklist)")
         }
         if i.recurring { parts.append("↻") }
-        // Con agenda y plazo en días distintos la tarjeta vive en el día agendado (ver
-        // TaskItem.placement), así que el plazo se anuncia aquí para no perderlo.
+        // With schedule and deadline on different days the card lives on the scheduled day (see
+        // TaskItem.placement), so the deadline is announced here so it isn't lost.
         if let d = i.deadline, let s = i.scheduled,
            !Calendar.current.isDate(d, inSameDayAs: s) {
             parts.append(L.f("card.vence", DateFormat.dueShort.string(from: d)))
@@ -131,8 +131,8 @@ final class TaskCard: NSView {
     }
 
     override var intrinsicContentSize: NSSize {
-        // Antes de la primera pasada de layout no hay ancho real: se usa una reserva
-        // y layout() invalida para corregir la altura en cuanto exista.
+        // Before the first layout pass there's no real width: a fallback is used
+        // and layout() invalidates to fix the height as soon as one exists.
         let w = lastMeasuredWidth > 0 ? lastMeasuredWidth : fallbackTextWidth
         let th = titleLabel.sizeThatFits(NSSize(width: w, height: 400)).height
         let metaEmpty = metaLabel.stringValue.isEmpty
@@ -141,7 +141,7 @@ final class TaskCard: NSView {
         return NSSize(width: NSView.noIntrinsicMetric, height: height)
     }
 
-    // MARK: interacción
+    // MARK: interaction
 
     override func mouseDown(with event: NSEvent) {
         if let item { onClick?(item) }
@@ -169,7 +169,7 @@ final class TaskCard: NSView {
     }
 }
 
-/// Columna del tablero: cabecera fija + lista desplazable de tarjetas.
+/// Board column: fixed header + scrollable list of cards.
 final class WeekColumnView: NSView {
     let day: Date?
     let titleText: String
@@ -194,8 +194,8 @@ final class WeekColumnView: NSView {
         headerLabel.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
         countLabel.font = NSFont.systemFont(ofSize: 11, weight: .regular)
         countLabel.alignment = .right
-        // Etiquetas normales traen resistencia 750 a comprimirlas: ocho columnas con
-        // ese piso pedían más ancho del que cabe en cualquier pantalla.
+        // Plain labels come with 750 compression resistance: eight columns with
+        // that floor asked for more width than fits on any screen.
         for l in [headerLabel, countLabel] {
             l.lineBreakMode = .byTruncatingTail
             l.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -262,7 +262,7 @@ final class WeekColumnView: NSView {
         layer?.borderColor = palette.separator.cgColor
         layer?.borderWidth = 1
 
-        // Hoy: fondo teñido con el acento, borde del mismo color y cabecera marcada.
+        // Today: background tinted with the accent, border of the same colour and highlighted header.
         let isToday = day.map { Calendar.current.isDate($0, inSameDayAs: Date()) } ?? false
         if isToday {
             let alpha: CGFloat = dimmed ? 0.06 : (palette.dark ? 0.22 : 0.13)
@@ -282,7 +282,7 @@ final class WeekColumnView: NSView {
             card.onClick = { [weak self] in self?.onSelect?($0) }
             card.onMenu = { [weak self] item in self?.onMenu?(item) }
             stack.addArrangedSubview(card)
-            // Después de agregarla: antes no habría ancestro común con la pila.
+            // After adding it: before that there'd be no common ancestor with the stack.
             card.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -18).isActive = true
         }
         if items.isEmpty && events.isEmpty {
@@ -294,7 +294,7 @@ final class WeekColumnView: NSView {
     }
 }
 
-/// Fila compacta de un evento del calendario dentro de la columna semanal.
+/// Compact row for a calendar event inside the weekly column.
 final class EventRow: NSView {
     init(event: CalEvent, palette: Palette) {
         super.init(frame: .zero)
@@ -325,8 +325,8 @@ final class EventRow: NSView {
         title.translatesAutoresizingMaskIntoConstraints = false
         title.toolTip = "\(event.calendarTitle) · \(event.timeText)"
         addSubview(title)
-        // Sin esto, un evento con título largo exigía su ancho intrínseco completo y
-        // arrastraba el ancho mínimo de la columna (y de la ventana) cientos de puntos.
+        // Without this, an event with a long title demanded its full intrinsic width and
+        // dragged the column's (and window's) minimum width up by hundreds of points.
         for l in [time, title] {
             l.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             l.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -350,9 +350,9 @@ final class EventRow: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) no se usa") }
 }
 
-/// Bandeja «sin fecha»: rejilla que aprovecha el alto en varias filas.
-/// Sustituye a la antigua fila única con scroll horizontal: ese scroller quedaba
-/// con una restricción de ancho fija y congelaba el ancho de la ventana.
+/// «Undated» tray: a grid that uses the height across several rows.
+/// Replaces the old single row with horizontal scrolling: that scroller ended up
+/// with a fixed width constraint and froze the window's width.
 final class UndatedTrayView: NSView {
     private let scroll = NSScrollView()
     private let doc = FlipView()
@@ -400,8 +400,8 @@ final class UndatedTrayView: NSView {
             scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
             grid.topAnchor.constraint(equalTo: doc.topAnchor),
             grid.leadingAnchor.constraint(equalTo: doc.leadingAnchor),
-            // El ancho útil lo fija esta cadena (doc == viewport, fila == doc - 2·inset);
-            // lo único que puede ceder es el ancho de cada tarjeta (prioridad 900).
+            // Usable width is set by this chain (doc == viewport, row == doc - 2·inset);
+            // the only thing that can give is each card's width (priority 900).
             grid.trailingAnchor.constraint(equalTo: doc.trailingAnchor),
             grid.bottomAnchor.constraint(equalTo: doc.bottomAnchor),
             doc.widthAnchor.constraint(equalTo: scroll.widthAnchor),
@@ -422,7 +422,7 @@ final class UndatedTrayView: NSView {
             c.onMenu = { [weak self] in self?.onMenu?($0) }
             return c
         }
-        perRow = -1                 // fuerza la recomposición en el próximo layout
+        perRow = -1                 // forces a re-layout on the next pass
         needsLayout = true
     }
 
@@ -453,31 +453,31 @@ final class UndatedTrayView: NSView {
             for _ in 0..<n where i < cards.count {
                 let card = cards[i]
                 row.addArrangedSubview(card)
-                // 200, medido: el cálculo del mínimo de la ventana respeta las
-                // restricciones de 250 para arriba. Con 900 y con 600 la ventana no bajaba
-                // de 1148 pt; con 200 baja hasta el mínimo declarado (900). Como el
-                // espaciador huguea a 50, las tarjetas igual mantienen sus 212 pt.
+                // 200, measured: the window-minimum calculation honours
+                // constraints from 250 upwards. With 900 and with 600 the window wouldn't go below
+                // 1148 pt; with 200 it goes down to the declared minimum (900). Since the
+                // spacer hugs at 50, the cards still keep their 212 pt.
                 let w = card.widthAnchor.constraint(equalToConstant: cardW)
                 w.priority = .init(200)
                 w.isActive = true
                 i += 1
             }
-            // Espaciador colapsable: absorbe el sobrante para que las tarjetas no se
-            // estiren cuando la fila queda corta.
+            // Collapsible spacer: absorbs the leftover so cards don't
+            // stretch when the row is short.
             let spacer = NSView()
             spacer.setContentHuggingPriority(.init(50), for: .horizontal)
             spacer.setContentCompressionResistancePriority(.init(50), for: .horizontal)
             row.addArrangedSubview(spacer)
             grid.addArrangedSubview(row)
-            // La fila nunca desborda la rejilla, pero puede ser más angosta: con `==` el
-            // ancho de la ventana heredaba la suma de las tarjetas de la fila (5 × 212 pt
-            // eran 1148 pt de mínimo) y la ventana no se podía achicar.
+            // The row never overflows the grid, but it can be narrower: with `==` the
+            // window width inherited the sum of the row's cards (5 × 212 pt
+            // made a 1148 pt minimum) and the window couldn't be shrunk.
             row.widthAnchor.constraint(lessThanOrEqualTo: grid.widthAnchor, constant: -inset * 2).isActive = true
         }
     }
 }
 
-/// Vista con origen arriba para que el scroll empiece en la cabecera.
+/// Top-left-origin view so scrolling starts at the header.
 final class FlipView: NSView {
     var topLeftOrigin = false
     override var isFlipped: Bool { topLeftOrigin }

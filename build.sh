@@ -1,5 +1,5 @@
 #!/bin/bash
-# Construye «Semana» (vista semanal de Things 3) sin proyecto de Xcode.
+# Builds «Semana» (weekly view for Things 3) without an Xcode project.
 # MacBook Air 2017 / macOS 13 / Swift 5.8 / SDK 13.3
 set -euo pipefail
 
@@ -11,12 +11,12 @@ APP="$BUILD_DIR/$APP_NAME.app"
 TARGET="x86_64-apple-macosx13.0"
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 
-echo "→ Compilando $APP_NAME (swiftc, $TARGET)"
+echo "→ Building $APP_NAME (swiftc, $TARGET)"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-# Medido en esta máquina: -O (whole-module) tarda minutos; sin -O compila y enlaza
-# en ~24 s. Por eso el build por defecto no optimiza. OPTIMIZE=1 para el binario fino.
+# Measured on this machine: -O (whole-module) takes minutes; without -O it compiles and links
+# in ~24 s. That's why the default build doesn't optimise. OPTIMIZE=1 for the optimised binary.
 
 ARGS=(-sdk "$SDK" -target "$TARGET"
       -framework AppKit -framework ServiceManagement -lsqlite3
@@ -51,22 +51,22 @@ if [ -f "$HERE/Resources/AppIcon.icns" ]; then
   cp "$HERE/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 fi
 
-# Identidad de firma. Ad-hoc ("-") basta para correr en local, pero cambia el hash
-# en cada build y macOS vuelve a pedir Acceso Total al Disco. Con una identidad
-# estable (certificado propio de "Code Signing" o Apple Development) el permiso
-# queda fijo:  SIGN_ID="Semana Dev" ./build.sh
+# Signing identity. Ad-hoc ("-") is enough to run locally, but the hash changes
+# on every build and macOS asks for Full Disk Access again. With a stable
+# identity (your own "Code Signing" certificate or Apple Development) the permission
+# sticks:  SIGN_ID="Semana Dev" ./build.sh
 SIGN_ID="${SIGN_ID:--}"
-echo "→ Firmando con identidad: ${SIGN_ID}  ('-' = ad-hoc)"
+echo "→ Signing with identity: ${SIGN_ID}  ('-' = ad-hoc)"
 codesign --force --deep --sign "$SIGN_ID" "$APP" >/dev/null 2>&1 \
   || codesign --force --sign "$SIGN_ID" "$APP"
 
-# Instalación opcional en ruta fija (TCC también clavea por ubicación del .app).
+# Optional install to a fixed path (TCC also keys on the .app's location).
 if [ -n "${INSTALL_DIR:-}" ]; then
   mkdir -p "$INSTALL_DIR"
   rm -rf "$INSTALL_DIR/$APP_NAME.app" 2>/dev/null || true
   cp -R "$APP" "$INSTALL_DIR/"
-  echo "→ Instalada en: $INSTALL_DIR/$APP_NAME.app"
+  echo "→ Installed at: $INSTALL_DIR/$APP_NAME.app"
 fi
 
-echo "→ Listo: $APP"
-echo "  Prueba:  open '$APP'"
+echo "→ Done: $APP"
+echo "  Try it:  open '$APP'"

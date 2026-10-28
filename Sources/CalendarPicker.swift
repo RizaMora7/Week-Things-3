@@ -1,14 +1,14 @@
 import AppKit
 
-/// Selector de calendarios en un popover que no se cierra al marcar.
+/// Calendar picker in a popover that doesn't close when you tick a box.
 ///
-/// Sustituye al antiguo NSMenu, que tenía tres defectos: se cerraba en cada clic (para
-/// cambiar cinco calendarios había que abrirlo cinco veces), repetía «· Google» en cada
-/// fila y mostraba tres veces un mismo título aunque la selección se guarda por título,
-/// así que marcar uno marcaba los tres sin que se viera.
+/// Replaces the old NSMenu, which had three flaws: it closed on every click (changing
+/// five calendars meant opening it five times), it repeated «· Google» on every row,
+/// and it showed the same title three times even though the selection is stored by
+/// title, so ticking one ticked all three without it being visible.
 ///
-/// Aquí cada título aparece una sola vez, agrupado bajo su cuenta, con el punto de color
-/// del calendario; el ruido de sistema (sugerencias, cumpleaños, fases lunares) va al final.
+/// Here each title appears once, grouped under its account, with the calendar's colour
+/// dot; system noise (suggestions, birthdays, moon phases) goes last.
 final class CalendarPicker: NSViewController {
     private struct Row { let title: String; let color: NSColor }
     private struct Section { let header: String; var rows: [Row] }
@@ -29,9 +29,9 @@ final class CalendarPicker: NSViewController {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) no se usa") }
 
-    /// Una fila por título (la primera aparición manda), agrupadas por cuenta en un
-    /// orden estable: iCloud, Google, Outlook/Exchange, el resto, locales, suscritos y,
-    /// al final, el ruido de sistema.
+    /// One row per title (first occurrence wins), grouped by account in a stable
+    /// order: iCloud, Google, Outlook/Exchange, the rest, local, subscribed and,
+    /// last, system noise.
     private static func group(_ calendars: [CalSource]) -> [Section] {
         let order = ["iCloud", "Google", "Outlook", "Exchange", "CalDAV"]
         var seen = Set<String>()
@@ -68,7 +68,7 @@ final class CalendarPicker: NSViewController {
             }
     }
 
-    // MARK: - Vista
+    // MARK: - View
 
     override func loadView() {
         let width: CGFloat = 300
@@ -96,7 +96,7 @@ final class CalendarPicker: NSViewController {
             for r in s.rows { list.addArrangedSubview(row(r)) }
         }
 
-        // Documento con origen arriba: el scroll empieza en la primera sección.
+        // Top-left-origin document: scrolling starts at the first section.
         let doc = FlipView()
         doc.topLeftOrigin = true
         doc.translatesAutoresizingMaskIntoConstraints = false
@@ -128,7 +128,7 @@ final class CalendarPicker: NSViewController {
         separator.widthAnchor.constraint(equalTo: root.widthAnchor, constant: -28).isActive = true
         scroll.widthAnchor.constraint(equalTo: root.widthAnchor, constant: -28).isActive = true
 
-        // Alto según el contenido, con tope para listas largas.
+        // Height follows the content, capped for long lists.
         list.layoutSubtreeIfNeeded()
         let natural = list.fittingSize.height
         scroll.heightAnchor.constraint(equalToConstant: min(natural, 440)).isActive = true
@@ -140,8 +140,8 @@ final class CalendarPicker: NSViewController {
     private func row(_ r: Row) -> NSView {
         let dot = NSView()
         dot.wantsLayer = true
-        // Opaco y con un aro gris neutro: los colores pálidos (lavanda, celeste) se
-        // perdían sobre el fondo claro del popover.
+        // Opaque with a neutral grey ring: pale colours (lavender, light blue) used to
+        // disappear against the popover's light background.
         dot.layer?.backgroundColor = r.color.withAlphaComponent(1).cgColor
         dot.layer?.cornerRadius = 4.5
         dot.layer?.borderWidth = 0.5
@@ -175,7 +175,7 @@ final class CalendarPicker: NSViewController {
         return b
     }
 
-    // MARK: - Acciones
+    // MARK: - Actions
 
     @objc private func toggled(_ sender: NSButton) {
         guard let title = checkboxes.first(where: { $0.value === sender })?.key else { return }

@@ -1,11 +1,11 @@
 import AppKit
 
-/// Un evento, ya en la fecha concreta en la que ocurre (recurrencias expandidas).
+/// An event, already on the concrete date it occurs (recurrences expanded).
 struct CalEvent: Equatable {
-    let id: Int              // event_id (ROWID de CalendarItem)
-    let dayKey: Int          // día de la ocurrencia, para agrupar
+    let id: Int              // event_id (CalendarItem ROWID)
+    let dayKey: Int          // day of the occurrence, for grouping
     let title: String
-    let start: Date?         // nil en todo el día
+    let start: Date?         // nil for all-day
     let end: Date?
     let allDay: Bool
     let calendarRowID: Int
@@ -14,7 +14,7 @@ struct CalEvent: Equatable {
 
     var sortDate: Date { start ?? Calendar.current.startOfDay(for: end ?? Date()) }
 
-    /// "10:30–11:30" o el texto de "todo el día" del idioma activo.
+    /// "10:30–11:30" or the active language's "all day" text.
     var timeText: String {
         guard !allDay, let s = start else { return L.s("cal.allDay") }
         let f = DateFormat.hm
@@ -28,35 +28,35 @@ struct CalEvent: Equatable {
     }
 }
 
-/// Un calendario disponible, para el selector.
+/// An available calendar, for the picker.
 struct CalSource: Identifiable, Equatable {
     let rowID: Int
     let title: String
-    /// Nombre crudo de la cuenta según la tabla `Store` ("iCloud", "Google", "Other",
-    /// "Subscribed Calendars", "Default" o el correo de la cuenta). Para mostrarlo,
-    /// pasar por `providerLabel`.
+    /// Raw account name from the `Store` table ("iCloud", "Google", "Other",
+    /// "Subscribed Calendars", "Default" or the account's email). To display it,
+    /// pass it through `providerLabel`.
     let provider: String
     var enabled: Bool
     var color: NSColor = .systemGray
     var id: Int { rowID }
 }
 
-/// Lee Apple Calendar (solo lectura) desde ~/Library/Calendars/Calendar.sqlitedb.
+/// Reads Apple Calendar (read-only) from ~/Library/Calendars/Calendar.sqlitedb.
 ///
-/// Datos verificados en esta máquina:
-/// - `OccurrenceCache.day` = CFAbsoluteTime de la medianoche LOCAL del día.
-/// - `OccurrenceCache.occurrence_date` = CFAbsoluteTime del inicio real de la ocurrencia
-///   (las columnas `occurrence_start_date`/`occurrence_end_date` vienen NULL).
-/// - La duración se toma de `CalendarItem.end_date - start_date` (estable entre instancias).
-/// - `Calendar.sqlitedb` es el archivo vivo; `Calendar Cache` no tiene las tablas Z que
-///   supone el prompt del cron antiguo.
+/// Facts verified on this machine:
+/// - `OccurrenceCache.day` = CFAbsoluteTime of the day's LOCAL midnight.
+/// - `OccurrenceCache.occurrence_date` = CFAbsoluteTime of the occurrence's real start
+///   (the `occurrence_start_date`/`occurrence_end_date` columns are NULL).
+/// - Duration comes from `CalendarItem.end_date - start_date` (stable across instances).
+/// - `Calendar.sqlitedb` is the live file; `Calendar Cache` lacks the Z tables
+///   the old cron prompt assumed.
 enum CalendarStore {
     enum CalError: LocalizedError {
         case notFound, unreadable(String)
         var errorDescription: String? {
             switch self {
-            case .notFound: return "No encontré la base de Calendarios."
-            case .unreadable(let m): return "No pude leer Apple Calendar: \(m)"
+            case .notFound: return L.s("err.calNotFound")
+            case .unreadable(let m): return L.f("err.calUnreadable", m)
             }
         }
     }
@@ -64,8 +64,8 @@ enum CalendarStore {
     private static let cfOffset: Double = 978_307_200
 
     private static func dbPath() -> String? {
-        // Mismo escape que `SEMANA_THINGS_DB` en ThingsStore: el modo demo del repo
-        // apunta a una base inventada, para no depender del calendario real del usuario.
+        // Same escape hatch as `SEMANA_THINGS_DB` in ThingsStore: the repo's demo mode
+        // points at a made-up database, so it doesn't depend on the user's real calendar.
         if let override = ProcessInfo.processInfo.environment["SEMANA_CALENDAR_DB"],
            !override.isEmpty, FileManager.default.fileExists(atPath: override) {
             return override
@@ -75,8 +75,8 @@ enum CalendarStore {
         return FileManager.default.fileExists(atPath: p) ? p : nil
     }
 
-    /// Calendarios visibles para el usuario, con los de sistema/ruido marcados como
-    /// candidatos a ir fuera por defecto.
+    /// Calendars visible to the user, with system/noise ones flagged as
+    /// candidates to be off by default.
     static func availableCalendars() -> [CalSource] {
         guard let path = dbPath(), let db = try? SQLiteDB(path: path, readOnly: true),
               let rows = try? db.rows("""
@@ -91,14 +91,14 @@ enum CalendarStore {
         var seenTitles = Set<String>()
         for r in rows {
             guard let title = r.str("title"), let rid = r.intg("rid") else { continue }
-            // Placeholders internos de Calendar ("DEFAULT_CALENDAR_NAME", ...): nunca
-            // traen eventos del usuario, así que ni se ofrecen en el selector.
+            // Calendar's internal placeholders ("DEFAULT_CALENDAR_NAME", ...): they never
+            // hold user events, so they aren't even offered in the picker.
             if title.hasPrefix("DEFAULT_") { continue }
-            // Lo mismo con el calendario "Default" del almacén Default de Apple.
+            // Same for the "Default" calendar in Apple's Default store.
             if title == "Default" && (r.str("store") ?? "") == "Default" { continue }
-            // Un mismo título puede aparecer en tres filas (iCloud/Google/Otros) cuando
-            // la cuenta se registró con el correo: se distinguen por rowid, pero el
-            // usuario elige por título.
+            // The same title can appear in three rows (iCloud/Google/Other) when the
+            // account was registered with the email: they differ by rowid, but the
+            // user picks by title.
             let noise = isNoise(title)
             if seenTitles.contains(title) && noise { continue }
             seenTitles.insert(title)
@@ -109,9 +109,9 @@ enum CalendarStore {
         return out
     }
 
-    /// Nombre de cuenta apto para mostrar. Se traduce al pintar el menú, no al leer la
-    /// base, para que un cambio de idioma surta efecto sin recargar. El almacén
-    /// "Default" de Apple no tiene proveedor: se deja vacío.
+    /// Account name fit for display. Translated when the menu is drawn, not when the
+    /// database is read, so a language change applies without reloading. Apple's
+    /// "Default" store has no provider: left empty.
     static func providerLabel(_ store: String) -> String {
         switch store {
         case "", "Default": return ""
@@ -119,8 +119,8 @@ enum CalendarStore {
         case "Subscribed Calendars": return L.s("cal.provider.subscribed")
         case "Google", "iCloud", "Exchange", "CalDAV": return store
         default:
-            // Google suele quedar registrado con el correo de la cuenta. Mejor decir
-            // "Google" que mostrar una dirección de correo entera en el menú.
+            // Google is usually registered with the account's email. Better to say
+            // "Google" than to show a whole email address in the menu.
             if store.contains("@") {
                 let domain = store.components(separatedBy: "@").last ?? ""
                 if domain.hasSuffix("gmail.com") || domain.hasSuffix("googlemail.com") { return "Google" }
@@ -132,7 +132,7 @@ enum CalendarStore {
         }
     }
 
-    /// Ruido conocido: calendarios de sistema, sugerencias, cumpleaños y astronomicía.
+    /// Known noise: system calendars, suggestions, birthdays and astronomy.
     static func isNoise(_ title: String) -> Bool {
         let t = title.lowercased()
         if t.contains("default") || t.contains("task") { return true }
@@ -143,7 +143,7 @@ enum CalendarStore {
         return false
     }
 
-    /// Eventos entre `from` (inclusive) y `to` (exclusive) de los calendarios elegidos.
+    /// Events between `from` (inclusive) and `to` (exclusive) for the chosen calendars.
     static func events(from: Date, to: Date, rowIDs: Set<Int>) -> [CalEvent] {
         guard let path = dbPath() else { return [] }
         guard let db = try? SQLiteDB(path: path, readOnly: true) else { return [] }
@@ -206,7 +206,7 @@ enum CalendarStore {
             out.append(CalEvent(
                 id: eid,
                 dayKey: Int(dayKey.timeIntervalSince1970),
-                title: title.isEmpty ? "(sin título)" : title,
+                title: title.isEmpty ? L.s("task.untitled") : title,
                 start: start, end: end, allDay: allDay,
                 calendarRowID: r.intg("cid") ?? 0,
                 calendarTitle: r.str("calTitle") ?? "",
@@ -216,7 +216,7 @@ enum CalendarStore {
         return out
     }
 
-    /// Colores de Calendar vienen como ARGB hexadecimal ("#CC73E1" o "#9886C3FF").
+    /// Calendar colours come as ARGB hex ("#CC73E1" or "#9886C3FF").
     static func parseHex(_ raw: String?) -> NSColor? {
         guard var s = raw?.trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
         if s.hasPrefix("#") { s.removeFirst() }
@@ -227,7 +227,7 @@ enum CalendarStore {
             r = CGFloat((v >> 16) & 0xFF) / 255; g = CGFloat((v >> 8) & 0xFF) / 255
             b = CGFloat(v & 0xFF) / 255; a = 1
         case 8:
-            // Calendarios usan AARRGGBB
+            // Calendars use AARRGGBB
             a = CGFloat((v >> 24) & 0xFF) / 255; r = CGFloat((v >> 16) & 0xFF) / 255
             g = CGFloat((v >> 8) & 0xFF) / 255; b = CGFloat(v & 0xFF) / 255
         default:

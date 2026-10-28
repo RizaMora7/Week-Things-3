@@ -6,20 +6,20 @@ final class BoardController: NSObject, NSWindowDelegate {
     private let window: NSWindow
     private var board = Board()
 
-    // Estado recordado
+    // Remembered state
     private var weekOffset: Int
     private var filter: BoardFilter
     private var theme: ThemeMode
     private var showUndated: Bool
     private var search: String
-    private var mode: Int                 // 0 semanal · 1 diaria
+    private var mode: Int                 // 0 weekly · 1 daily
     private var dayOffset: Int
     private var framework: PlanFramework
     private var trayScope: TrayScope
     private var calendars: [CalSource] = []
     private var events: [CalEvent] = []
 
-    // Vistas
+    // Views
     private let titleLabel = NSTextField(labelWithString: "")
     private let statusLabel = NSTextField(labelWithString: "")
     private let columnsBar = NSView()
@@ -47,7 +47,7 @@ final class BoardController: NSObject, NSWindowDelegate {
 
     override init() {
         let p = Prefs.shared
-        L.apply(p.language)                 // antes de formatear cualquier fecha
+        L.apply(p.language)                 // before formatting any date
         self.weekOffset = p.weekOffset
         self.filter = p.filterMode
         self.theme = p.themeMode
@@ -58,8 +58,8 @@ final class BoardController: NSObject, NSWindowDelegate {
         self.framework = p.framework
         self.trayScope = p.trayScope
 
-        // `--day` / `--week` en la línea de órdenes: arrancar en una vista concreta sin
-        // tocar la preferencia guardada (la usa Tools/demo.sh).
+        // `--day` / `--week` on the command line: start in a given view without
+        // touching the saved preference (used by Tools/demo.sh).
         let args = ProcessInfo.processInfo.arguments
         if args.contains("--day") { self.mode = 1 }
         else if args.contains("--week") { self.mode = 0 }
@@ -76,7 +76,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         window.title = L.s("win.week")
         window.titleVisibility = .visible
         window.tabbingMode = .disallowed
-        window.isRestorable = false      // la restauración de macOS revive marcos de otra configuración de monitores
+        window.isRestorable = false      // macOS state restoration revives frames from other monitor setups
         discardUnusableSavedFrame()
         window.setFrameAutosaveName("ThingsWeekMain")
         window.delegate = self
@@ -87,8 +87,8 @@ final class BoardController: NSObject, NSWindowDelegate {
         applyTheme()
     }
 
-    /// Un marco autosave venido de un monitor ya desconectado puede dejar la ventana
-    /// más grande que cualquier pantalla: entonces se descarta y arranca centrada.
+    /// An autosaved frame from a monitor that is no longer connected can leave the window
+    /// larger than any screen: in that case it is discarded and the window starts centred.
     private func discardUnusableSavedFrame() {
         let key = "NSWindow Frame ThingsWeekMain"
         guard let saved = UserDefaults.standard.string(forKey: key) else { return }
@@ -104,7 +104,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         }
     }
 
-    // MARK: - Montaje de interfaz
+    // MARK: - Interface setup
 
     private func buildUI() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 1240, height: 720))
@@ -172,9 +172,9 @@ final class BoardController: NSObject, NSWindowDelegate {
         searchField.sendsWholeSearchString = false
         searchField.sendsSearchStringImmediately = true
         let searchWidth = searchField.widthAnchor.constraint(equalToConstant: 250)
-        // 200: por debajo de la resistencia de los desplegables (300) para que se encoja
-        // el buscador antes que truncarse "Semana"/"Claro", y por debajo de 250 para que
-        // el mínimo de la ventana no lo tome como demanda dura.
+        // 200: below the pop-ups' resistance (300) so the search field shrinks
+        // before "Semana"/"Claro" get truncated, and below 250 so the window's
+        // minimum size doesn't treat it as a hard requirement.
         searchWidth.priority = .init(200)
         searchWidth.isActive = true
 
@@ -199,22 +199,22 @@ final class BoardController: NSObject, NSWindowDelegate {
             weekGroup.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
             right.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -14),
             right.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-            // Con ventanas estrechas, que el título se acorte: nada de montarse sobre el buscador.
+            // In narrow windows the title shortens instead of overlapping the search field.
             right.leadingAnchor.constraint(greaterThanOrEqualTo: weekGroup.trailingAnchor, constant: 12),
         ])
         titleLabel.lineBreakMode = .byTruncatingTail
-        // Orden en que cede la barra cuando no cabe: primero la fecha (150, que ya está
-        // escrita en el título de la ventana), después el buscador (200) y al final los
-        // desplegables y botones (300), que tienen que seguir siendo legibles.
+        // Order in which the bar gives way when it doesn't fit: first the date (150, already
+        // shown in the window title), then the search field (200) and finally the
+        // pop-ups and buttons (300), which must stay readable.
         titleLabel.setContentCompressionResistancePriority(.init(150), for: .horizontal)
         titleLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         titleLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 60).isActive = true
 
-        // La barra era el suelo de ancho real de la ventana: seis desplegables y dos
-        // botones con resistencia 750 sumaban ~1332 pt por su ancho intrínseco. 240 es el
-        // número justo: sigue por encima del buscador (200) y de la fecha (150), así que
-        // son lo último que cede, pero queda debajo de 250, el umbral a partir del cual
-        // AppKit trata la restricción como demanda dura al calcular el mínimo de la ventana.
+        // The bar used to be the window's real minimum width: six pop-ups and two
+        // buttons at resistance 750 added up to ~1332 pt of intrinsic width. 240 is the
+        // right number: still above the search field (200) and the date (150), so they
+        // are the last to give way, but below 250, the threshold from which AppKit
+        // treats the constraint as a hard requirement when computing the window minimum.
         for v in [modePop, frameworkPop, filterPop, themePop, refreshPop,
                   calendarsButton, reload] as [NSView] {
             v.setContentCompressionResistancePriority(.init(240), for: .horizontal)
@@ -223,10 +223,10 @@ final class BoardController: NSObject, NSWindowDelegate {
         }
         searchField.setContentCompressionResistancePriority(.init(200), for: .horizontal)
 
-        // Las ocho columnas van dentro de un scroll horizontal: si no, su ancho suma
-        // (8 × 220 + separación) se convierte en el ancho mínimo de la ventana y ya no se
-        // puede achicar. El documento es *al menos* tan ancho como el viewport (para no
-        // dejar hueco a la derecha) y puede ser más (para desplazarse).
+        // The eight columns live inside a horizontal scroll view: otherwise their total width
+        // (8 × 220 + spacing) becomes the window's minimum width and it can no longer be
+        // made smaller. The document is *at least* as wide as the viewport (so no gap is
+        // left on the right) and may be wider (so it scrolls).
         columnsScroll.hasHorizontalScroller = true
         columnsScroll.hasVerticalScroller = false
         columnsScroll.autohidesScrollers = true
@@ -246,10 +246,10 @@ final class BoardController: NSObject, NSWindowDelegate {
             columnsBar.bottomAnchor.constraint(equalTo: columnsScroll.contentView.bottomAnchor),
         ])
         let fillWidth = columnsBar.widthAnchor.constraint(greaterThanOrEqualTo: columnsScroll.contentView.widthAnchor)
-        fillWidth.priority = .defaultHigh        // cede ante el techo de 220 pt por columna
+        fillWidth.priority = .defaultHigh        // yields to the 220 pt per-column ceiling
         fillWidth.isActive = true
 
-        // El plan diario ocupa la misma región que las columnas: se alternan con isHidden.
+        // The daily plan uses the same region as the columns: they alternate via isHidden.
         dayPlanView.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(dayPlanView)
         NSLayoutConstraint.activate([
@@ -264,8 +264,8 @@ final class BoardController: NSObject, NSWindowDelegate {
         dayPlanView.isHidden = mode == 0
         frameworkPop.isHidden = mode == 0
 
-        // Cabecera de la bandeja: desplegar/plegar + alcance. Una sola pila para
-        // poder colapsarla con una única restricción de altura.
+        // Tray header: expand/collapse + scope. A single stack so it can be
+        // collapsed with one height constraint.
         undatedHeader.isBordered = false
         undatedHeader.bezelStyle = .inline
         undatedHeader.title = "▾ " + L.s("tray.undated")
@@ -312,7 +312,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         statusLabel.font = NSFont.systemFont(ofSize: 10.5)
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.lineBreakMode = .byTruncatingMiddle
-        // Es texto informativo: que se acorte, no que obligue a abrir la ventana.
+        // It's informational text: let it truncate rather than force the window wider.
         statusLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         statusLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -386,11 +386,11 @@ final class BoardController: NSObject, NSWindowDelegate {
             }
         }
         NSLayoutConstraint.activate(constraints)
-        // Las columnas se reparten el ancho visible (prioridad 800, por encima del deseo
-        // de 750 de sus etiquetas) y solo tienen un piso duro de 104 pt. Si la ventana
-        // baja de ahí, el documento queda más ancho que el viewport y aparece el scroll
-        // horizontal. Ya no hace falta techo: dentro del scroller las columnas no pueden
-        // estirar la ventana.
+        // Columns share the visible width (priority 800, above their labels'
+        // 750 hugging) and only have a hard floor of 104 pt. If the window
+        // goes below that, the document becomes wider than the viewport and horizontal
+        // scrolling appears. No ceiling is needed any more: inside the scroller the columns
+        // can't stretch the window.
         columns[0].widthAnchor.constraint(greaterThanOrEqualToConstant: 104).isActive = true
         let share = columns[0].widthAnchor.constraint(equalTo: columnsScroll.contentView.widthAnchor,
                                                       multiplier: 1.0 / 8.0, constant: -7)
@@ -398,7 +398,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         share.isActive = true
     }
 
-    // MARK: - Datos
+    // MARK: - Data
 
     var weekStart: Date {
         let base = WeekRangeHelper.mondayOfWeek(containing: Date(), calendar: calendar)
@@ -428,9 +428,9 @@ final class BoardController: NSObject, NSWindowDelegate {
         for s in NSScreen.screens { p("  screen frame=\(s.frame) visible=\(s.visibleFrame)") }
     }
 
-    /// Diagnóstico (SEMANA_SHRINK=<ancho>): pide el ancho desde dentro y reporta el que
-    /// realmente quedó. Es la única forma honesta de medir el mínimo que imponen las
-    /// restricciones: `fittingSize` y Accessibility devuelven otros números.
+    /// Diagnostics (SEMANA_SHRINK=<width>): requests the width from inside and reports what
+    /// it actually ended up as. It's the only honest way to measure the minimum imposed by
+    /// the constraints: `fittingSize` and Accessibility report different numbers.
     func debugShrink() {
         func p(_ s: String) { FileHandle.standardError.write((s + "\n").data(using: .utf8)!) }
         let want = CGFloat(Int(ProcessInfo.processInfo.environment["SEMANA_SHRINK"] ?? "1000") ?? 1000)
@@ -512,7 +512,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         let end = WeekRangeHelper.addDays(7, to: weekStart, calendar: calendar)
         let today = calendar.startOfDay(for: Date())
 
-        // Columna de atrasadas: todo lo con fecha anterior al lunes mostrado.
+        // Overdue column: everything dated before the Monday on screen.
         let overdue = items.filter { item in
             guard let p = item.placement else { return false }
             return calendar.startOfDay(for: p) < weekStart
@@ -524,7 +524,7 @@ final class BoardController: NSObject, NSWindowDelegate {
             let day = WeekRangeHelper.addDays(i, to: weekStart, calendar: calendar)
             let isToday = sameDay(day, today)
             let dayItems = items.filter { item in
-                // placement = deadline si existe, si no startDate (ver TaskItem).
+                // placement is the earlier of scheduled date and deadline (see TaskItem).
                 guard let p = item.placement else { return false }
                 return sameDay(p, day)
             }
@@ -533,7 +533,7 @@ final class BoardController: NSObject, NSWindowDelegate {
                   header: DateFormat.header(day) + (isToday ? " · " + L.s("day.hoyShort") : ""), dimmed: false)
         }
 
-        // Bandeja sin fecha, con el alcance elegido por el usuario.
+        // Undated tray, with the scope chosen by the user.
         let undatedAll = items.filter { !$0.hasDate }
         let undated = applyTrayScope(undatedAll, weekItems: items)
         tray.set(items: undated, palette: pal)
@@ -581,13 +581,13 @@ final class BoardController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Cómo se leyó Things, en el idioma activo. `ThingsStore` guarda un token neutro
-    /// ("live" / "mirror"), no texto ya traducido.
+    /// How Things was read, in the active language. `ThingsStore` stores a neutral token
+    /// ("live" / "mirror"), not already-translated text.
     private var readModeLabel: String {
         board.readMode == "mirror" ? L.s("mode.mirror") : L.s("mode.live")
     }
 
-    /// Qué deja pasar cada alcance de la bandeja.
+    /// What each tray scope lets through.
     private func applyTrayScope(_ undated: [TaskItem], weekItems: [TaskItem]) -> [TaskItem] {
         switch trayScope {
         case .all:
@@ -595,8 +595,8 @@ final class BoardController: NSObject, NSWindowDelegate {
         case .inbox:
             return undated.filter { $0.start == .inbox || $0.start == .anytime }
         case .week:
-            // Relevante para la semana mostrada: comparte proyecto o área con lo
-            // que ya tiene fecha en ella, o está en la Bandeja de entrada.
+            // Relevant to the week on screen: shares a project or area with something
+            // already dated in it, or is in the Inbox.
             let projects = Set(weekItems.compactMap { $0.project })
             let areas = Set(weekItems.compactMap { $0.area })
             return undated.filter {
@@ -605,7 +605,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         }
     }
 
-    /// Ruta del modo diario: pinta el plan del día elegido con el marco activo.
+    /// Daily mode path: draws the plan for the chosen day with the active framework.
     private func renderDayPlan(_ pal: Palette, items: [TaskItem], error: String?) {
         applyTrayLayout()
         let day = calendar.startOfDay(for: selectedDay)
@@ -625,8 +625,8 @@ final class BoardController: NSObject, NSWindowDelegate {
                                                DateFormat.time.string(from: board.generatedAt))
     }
 
-    /// `isHidden` no saca una vista del Auto Layout: hay que colapsar también sus
-    /// alturas, o la bandeja le sigue robando espacio al plan diario.
+    /// `isHidden` doesn't remove a view from Auto Layout: its heights must be collapsed
+    /// too, or the tray keeps stealing space from the daily plan.
     private func applyTrayLayout() {
         let weekly = mode == 0
         trayBar.isHidden = !weekly
@@ -652,7 +652,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         undatedHeader.contentTintColor = pal.meta
     }
 
-    // MARK: - Acciones
+    // MARK: - Actions
 
     @objc private func prevWeek() { weekOffset -= 1; Prefs.shared.weekOffset = weekOffset; render() }
     @objc private func nextWeek() { weekOffset += 1; Prefs.shared.weekOffset = weekOffset; render() }
@@ -690,8 +690,8 @@ final class BoardController: NSObject, NSWindowDelegate {
     private var calendarPopover: NSPopover?
     private var calendarReload: DispatchWorkItem?
 
-    /// Selector de calendarios (popover que sigue abierto al marcar); se guarda la
-    /// selección por título.
+    /// Calendar picker (a popover that stays open while ticking); the selection is
+    /// saved by title.
     @objc func showCalendarMenu() {
         if let open = calendarPopover, open.isShown { open.performClose(nil); return }
         if calendars.isEmpty { calendars = CalendarStore.availableCalendars() }
@@ -706,8 +706,8 @@ final class BoardController: NSObject, NSWindowDelegate {
         pop.show(relativeTo: calendarsButton.bounds, of: calendarsButton, preferredEdge: .minY)
     }
 
-    /// Guarda al instante y recarga tras una breve pausa, para no releer las bases en
-    /// cada casilla cuando se marcan varias seguidas.
+    /// Saves immediately and reloads after a short pause, so the databases aren't re-read
+    /// for every checkbox when several are ticked in a row.
     private func applySelection(titles: Set<String>) {
         for i in calendars.indices { calendars[i].enabled = titles.contains(calendars[i].title) }
         Prefs.shared.enabledCalendars = Array(titles).sorted()
@@ -726,7 +726,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         calendars = src
     }
 
-    // Envolventes para el menú principal
+    // Wrappers for the main menu
     @objc func prevWeekAction() { prevWeek() }
     @objc func nextWeekAction() { nextWeek() }
     @objc func todayAction() { gotoToday() }
@@ -770,11 +770,11 @@ final class BoardController: NSObject, NSWindowDelegate {
         render()
     }
 
-    /// La app la instala para que el menú principal se rehaga en el idioma nuevo.
+    /// Installed by the app so the main menu is rebuilt in the new language.
     var menuRebuilder: (() -> Void)?
 
-    /// Cambia el idioma sin reiniciar: se rehacen los textos de la barra, el menú
-    /// principal y todo lo que pinta render().
+    /// Changes the language without restarting: rebuilds the bar's texts, the main
+    /// menu and everything render() draws.
     func applyLanguage(_ lang: Lang) {
         Prefs.shared.language = lang
         L.apply(lang)
@@ -803,7 +803,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         render()
     }
 
-    /// Los tres botones de navegación viven dentro de la pila de la barra.
+    /// The three navigation buttons live inside the bar's stack.
     private var weekGroupButtons: [NSButton] {
         guard let stack = titleLabel.superview as? NSStackView else { return [] }
         return stack.arrangedSubviews.compactMap { $0 as? NSButton }
@@ -832,7 +832,7 @@ final class BoardController: NSObject, NSWindowDelegate {
     }
 
     private func completeItem(_ item: TaskItem) {
-        // Things rechaza `completed` en repetitivas; el menú ya lo desactiva, esto es la red.
+        // Things rejects `completed` on repeating to-dos; the menu already disables it, this is the safety net.
         guard !item.recurring else { return }
         guard let token = board.authToken else {
             let a = NSAlert()
@@ -879,7 +879,7 @@ final class BoardController: NSObject, NSWindowDelegate {
         NSPasteboard.general.setString(i.id, forType: .string)
     }
 
-    // MARK: - Refresco programado
+    // MARK: - Scheduled refresh
 
     private func scheduleTimer() {
         timer?.invalidate()
@@ -898,8 +898,8 @@ final class BoardController: NSObject, NSWindowDelegate {
     func showMainWindow() { window.makeKeyAndOrderFront(nil) }
     var mainWindow: NSWindow { window }
 
-    // MARK: - Preferencias de arranque
-    // (El arranque automático se gestiona desde el menú de la app con SMAppService.)
+    // MARK: - Startup preferences
+    // (Launch at login is managed from the app menu with SMAppService.)
 
     func windowWillClose(_ notification: Notification) { NSApp.terminate(nil) }
 }

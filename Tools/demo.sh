@@ -1,11 +1,11 @@
 #!/bin/zsh
-# demo.sh — construye las bases inventadas y abre la app apuntando a ellas.
+# demo.sh — builds the made-up databases and opens the app pointed at them.
 #
-#   zsh Tools/demo.sh              # tablero semanal de ejemplo
-#   zsh Tools/demo.sh --day        # vista del día
+#   zsh Tools/demo.sh              # sample weekly board
+#   zsh Tools/demo.sh --day        # day view
 #
-# No toca tus datos: la app recibe las rutas por variable de entorno
-# (SEMANA_THINGS_DB / SEMANA_CALENDAR_DB) y lee solo build/demo/.
+# Doesn't touch your data: the app receives the paths via environment variables
+# (SEMANA_THINGS_DB / SEMANA_CALENDAR_DB) and only reads build/demo/.
 set -e
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 bash "$HERE/Tools/makedemo.sh"
@@ -14,6 +14,6 @@ export SEMANA_THINGS_DB="$HERE/build/demo/things.sqlite"
 export SEMANA_CALENDAR_DB="$HERE/build/demo/calendar.sqlite"
 
 BIN="$HERE/build/Semana.app/Contents/MacOS/Semana"
-[ -x "$BIN" ] || { echo "primero compila: ./build.sh"; exit 1; }
+[ -x "$BIN" ] || { echo "build first: ./build.sh"; exit 1; }
 echo "→ demo: $SEMANA_THINGS_DB"
 "$BIN" "$@"

@@ -3,7 +3,7 @@ import SQLite3
 
 private let SQLITE_TRANSIENT = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-/// Envoltura mínima de sqlite3 para lectura (y apertura de copias temporales).
+/// Minimal sqlite3 wrapper for reading (and for opening temporary copies).
 final class SQLiteDB {
     enum Error: LocalizedError {
         case cannotOpen(String)
@@ -11,8 +11,8 @@ final class SQLiteDB {
 
         var errorDescription: String? {
             switch self {
-            case .cannotOpen(let p): return "No se pudo abrir la base de datos en \(p)"
-            case .prepare(let sql, let msg): return "Consulta SQL falló: \(msg)\n\(sql)"
+            case .cannotOpen(let p): return L.f("err.dbOpen", p)
+            case .prepare(let sql, let msg): return L.f("err.sql", msg, sql)
             }
         }
     }
@@ -38,7 +38,7 @@ final class SQLiteDB {
         if let h = handle { sqlite3_close_v2(h) }
     }
 
-    /// Ejecuta una consulta y entrega cada fila como diccionario nombre→valor.
+    /// Runs a query and returns each row as a name→value dictionary.
     func rows(_ sql: String) throws -> [[String: Any?]] {
         var stmt: OpaquePointer?
         guard sqlite3_prepare_v2(handle, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else {

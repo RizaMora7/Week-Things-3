@@ -1,10 +1,10 @@
 import Foundation
 
-/// Idioma de la interfaz. `system` sigue el idioma del sistema.
+/// Interface language. `system` follows the system language.
 enum Lang: Int, CaseIterable {
     case system = 0, spanish = 1, english = 2
 
-    /// `nil` en `.system`: hay que preguntar al sistema.
+    /// `nil` for `.system`: the system has to be asked.
     var fixedCode: String? {
         switch self {
         case .system: return nil
@@ -13,8 +13,8 @@ enum Lang: Int, CaseIterable {
         }
     }
 
-    /// "English" se escribe "English" también en español: es el nombre del idioma, no
-    /// una traducción.
+    /// "English" is written "English" in Spanish too: it's the language's name, not
+    /// a translation.
     var label: String {
         switch self {
         case .system: return L.s("lang.system")
@@ -24,19 +24,19 @@ enum Lang: Int, CaseIterable {
     }
 }
 
-/// Todos los textos que ve el usuario pasan por aquí. `es` es el idioma base del
-/// proyecto; `en` se añadió después, así que cada clave vive en la misma fila para
-/// que añadir un tercero sea escribir una columna más, no reescribir la app.
+/// Every user-facing string goes through here. `es` is the project's base
+/// language; `en` was added later, so each key lives on the same row so that
+/// adding a third one means writing one more column, not rewriting the app.
 enum L {
-    /// "es" | "en". Se resuelve al arrancar y al cambiar de idioma.
+    /// "es" | "en". Resolved at launch and when the language changes.
     static private(set) var code = "es"
 
     static func apply(_ pref: Lang) {
         if let c = pref.fixedCode {
             code = c
         } else {
-            // `Locale.languageCode` está deprecada desde macOS 14, pero el reemplazo
-            // (`language.languageCode`) exige SDK 14 y esta app apunta a 13: se queda así.
+            // `Locale.languageCode` is deprecated since macOS 14, but its replacement
+            // (`language.languageCode`) requires SDK 14 and this app targets 13: it stays.
             let raw = Locale.current.languageCode ?? Locale.current.identifier
             code = raw.hasPrefix("es") ? "es" : "en"
         }
@@ -48,7 +48,7 @@ enum L {
         return code == "en" ? row.1 : row.0
     }
 
-    /// Formato con `%@` / `%d`. Los argumentos salen ya en el idioma activo.
+    /// Format with `%@` / `%d`. Arguments are already in the active language.
     static func f(_ key: String, _ args: CVarArg...) -> String {
         String(format: s(key), arguments: args)
     }
@@ -57,14 +57,14 @@ enum L {
         String(format: s(key), arguments: args)
     }
 
-    /// Sustantivo en singular o plural según el conteo. `%@` dentro de las frases.
+    /// Singular or plural noun depending on the count. `%@` inside the sentences.
     static func n(_ key: String, _ count: Int) -> String {
         guard let row = plurals[key] else { return key }
         if code == "en" { return count == 1 ? row.2 : row.3 }
         return count == 1 ? row.0 : row.1
     }
 
-    /// (uno ES, varios ES, uno EN, varios EN)
+    /// (one ES, many ES, one EN, many EN)
     private static let plurals: [String: (String, String, String, String)] = [
         "u.event":   ("evento", "eventos", "event", "events"),
         "u.block":   ("bloque", "bloques", "block", "blocks"),
@@ -75,7 +75,7 @@ enum L {
 
     // swiftlint:disable:next type_contents_order
     private static let table: [String: (String, String)] = [
-        // MARK: menú de aplicación
+        // MARK: app menu
         "menu.about":       ("Acerca de Semana", "About Semana"),
         "menu.login":       ("Abrir al iniciar sesión", "Launch at login"),
         "menu.hide":        ("Ocultar Semana", "Hide Semana"),
@@ -101,7 +101,7 @@ enum L {
         "menu.zoom":        ("Zoom", "Zoom"),
         "menu.calendars":   ("Calendarios…", "Calendars…"),
 
-        // MARK: opciones
+        // MARK: options
         "theme.auto":       ("Automático (por hora)", "Auto (by hour)"),
         "theme.light":      ("Claro", "Light"),
         "theme.dark":       ("Oscuro", "Dark"),
@@ -118,7 +118,7 @@ enum L {
         "refresh.5m":       ("Cada 5 min", "Every 5 min"),
         "refresh.15m":      ("Cada 15 min", "Every 15 min"),
 
-        // MARK: barra superior
+        // MARK: top bar
         "bar.search":       ("Buscar título, proyecto o etiqueta", "Search title, project or tag"),
         "bar.loading":      ("Cargando…", "Loading…"),
         "bar.today":        ("Hoy", "Today"),
@@ -137,7 +137,7 @@ enum L {
         "tip.calendars":    ("Elige qué calendarios entran en la vista", "Choose which calendars show up"),
         "tip.reload":       ("Volver a leer la base de Things (⌘R)", "Re-read the Things database (⌘R)"),
 
-        // MARK: títulos de ventana y cabeceras
+        // MARK: window titles and headers
         "win.week":         ("Semana · Things 3", "Week · Things 3"),
         "win.day":          ("Plan del día · Things 3", "Day plan · Things 3"),
         "win.weekOffset":   ("Semana %@ · Things 3", "Week %@ · Things 3"),
@@ -146,7 +146,7 @@ enum L {
         "day.hoyShort":     ("hoy", "today"),
         "col.overdue":      ("Atrasadas", "Overdue"),
         "col.previous":     ("Anteriores", "Earlier"),
-        /// Aviso en la tarjeta cuando el plazo cae en otro día del que la muestra.
+        /// Notice on the card when the deadline falls on a different day from the one showing it.
         "card.vence":       ("vence %@", "due %@"),
         "tray.undated":     ("Sin fecha", "Undated"),
         "tray.scope":       ("Alcance ▾", "Scope ▾"),
@@ -158,7 +158,7 @@ enum L {
         "start.someday":    ("Alguna vez", "Someday"),
         "start.unknown":    ("—", "—"),
 
-        // MARK: barra de estado
+        // MARK: status bar
         "st.open":          ("Abiertas", "Open"),
         "st.dated":         ("con fecha", "dated"),
         "st.overdue":       ("atrasadas", "overdue"),
@@ -177,7 +177,7 @@ enum L {
         "mode.live":        ("base viva, solo lectura", "live database, read-only"),
         "mode.mirror":      ("espejo temporal", "temporary mirror"),
 
-        // MARK: plan del día
+        // MARK: day plan
         "day.timeline":     ("Timeline 08:00–18:00", "Timeline 08:00–18:00"),
         "day.legend":       ("barras: azul = calendario · rojo = profundo · verde = administrativo · " +
                              "morado = energía baja · gris = buffer · claro = pausa",
@@ -214,7 +214,7 @@ enum L {
         "day.priority":     ("%1$@ · %2$d min", "%1$@ · %2$d min"),
         "day.urgCal":       ("urgente por calendario", "urgent by calendar"),
 
-        // MARK: marcos
+        // MARK: frameworks
         "fw.eisenhower":    ("Matriz de Eisenhower", "Eisenhower matrix"),
         "fw.timeBlock":     ("Time blocking por energía", "Time blocking by energy"),
         "fw.frog":          ("Eat the Frog + 2 min + Parkinson", "Eat the Frog + 2 min + Parkinson"),
@@ -248,7 +248,7 @@ enum L {
         "fx.pareto":        ("Las 3 tareas que explican la mayor parte del avance; el resto es relleno.",
                              "The 3 tasks behind most of the progress; the rest is filler."),
 
-        // MARK: cuadrantes, MoSCoW, bloques
+        // MARK: quadrants, MoSCoW, blocks
         "q1.title":         ("Hazlo ahora", "Do it now"),
         "q1.hint":          ("urgente + importante", "urgent + important"),
         "q2.title":         ("Agenda", "Schedule it"),
@@ -270,7 +270,7 @@ enum L {
         "b.buffer":         ("Buffer", "Buffer"),
         "b.longBreak":      ("Pausa larga", "Long break"),
 
-        // MARK: directrices
+        // MARK: guidelines
         "d.frog":           ("Frog: «%@»%@. Sin notificaciones hasta cerrarla.",
                              "Frog: “%@”%@. No notifications until it's done."),
         "d.at":             (" a las %@", " at %@"),
@@ -298,7 +298,7 @@ enum L {
                              "Parkinson: every block has an end time. If time is left, it closes early, " +
                              "it doesn't stretch."),
 
-        // MARK: menú contextual de tarjetas
+        // MARK: card context menu
         "ctx.open":         ("Abrir en Things", "Open in Things"),
         "ctx.complete":     ("Completar", "Complete"),
         "ctx.completeRecurring": ("Things no permite completar tareas repetitivas desde otra app. " +
@@ -314,7 +314,7 @@ enum L {
         "ctx.copyUUID":     ("Copiar UUID", "Copy UUID"),
         "ctx.show":         ("Mostrar en Things", "Show in Things"),
 
-        // MARK: calendarios
+        // MARK: calendars
         "cal.all":          ("Todos", "All"),
         "cal.mine":         ("Solo los míos", "Only mine"),
         "cal.none":         ("Ninguno", "None"),
@@ -325,7 +325,7 @@ enum L {
         "cal.provider.other":      ("Otros", "Other"),
         "cal.section.noise":       ("Sugerencias y sistema", "Suggestions & system"),
 
-        // MARK: errores y avisos
+        // MARK: errors and notices
         "err.notFound":     ("No encontré la base de Things 3. ¿Está instalado y con datos?",
                              "Couldn't find the Things 3 database. Is Things installed and populated?"),
         "err.permission":   ("No pude leer la base de Things, ni en modo solo lectura ni por espejo. " +
@@ -337,6 +337,15 @@ enum L {
         "err.query":        ("La consulta a la base falló: %@",
                              "The database query failed: %@"),
         "err.noData":       ("Sin datos", "no data"),
+        "err.fdaBlocked":   ("macOS bloqueó el acceso a la base de Things. Concede Acceso Total al Disco a «Semana» " +
+                             "(Ajustes del Sistema → Privacidad y seguridad → Acceso Total al Disco) y reinicia la app.",
+                             "macOS blocked access to the Things database. Grant Full Disk Access to «Semana» " +
+                             "(System Settings → Privacy & Security → Full Disk Access) and restart the app."),
+        "err.calNotFound":  ("No encontré la base de Calendarios.", "Couldn't find the Calendar database."),
+        "err.calUnreadable": ("No pude leer Apple Calendar: %@", "Couldn't read Apple Calendar: %@"),
+        "err.dbOpen":       ("No se pudo abrir la base de datos en %@", "Couldn't open the database at %@"),
+        "err.sql":          ("Consulta SQL falló: %@\n%@", "SQL query failed: %@\n%@"),
+        "task.untitled":    ("(sin título)", "(untitled)"),
         "alert.fda.title":  ("Semana necesita Acceso Total al Disco", "Semana needs Full Disk Access"),
         "alert.fda.body":   ("Things 3 no expone una API de lectura, así que la app lee su base SQLite " +
                              "en modo solo lectura.\n\nSi la ventana sale vacía con un aviso de permisos:\n" +

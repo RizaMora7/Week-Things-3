@@ -1,382 +1,388 @@
-# Semana · Things 3 + calendario, en vista semanal y plan de día
+# Semana · Things 3 + Calendar as a weekly board and a day plan
 
-App nativa para macOS (AppKit, sin Storyboard ni proyecto de Xcode) con dos vistas sobre
-la misma ventana:
+A native macOS app (AppKit, no Storyboard, no Xcode project) with two views in the same
+window. *Semana* is Spanish for "week".
 
-- **Semana**: tablero de lunes a domingo con las tareas abiertas de Things 3, una columna
-  de atrasadas, los eventos del calendario en su día y una bandeja de tareas sin fecha.
-- **Día**: plan del día elegido, calculado con el marco metodológico que selecciones
-  (Eisenhower, time blocking por energía, Eat the Frog, MoSCoW, 1-3-5 o Pareto Top-3).
+- **Week**: a Monday-to-Sunday board with your open Things 3 to-dos, an overdue column,
+  calendar events on their day, and a tray of undated to-dos.
+- **Day**: a plan for the chosen day, built with the framework you pick
+  (Eisenhower, time blocking by energy, Eat the Frog, MoSCoW, 1-3-5 or Pareto Top 3).
 
-Escrita para un MacBook Air 2017 con macOS 13: binario Intel, sin dependencias externas,
-una sola librería del sistema (`libsqlite3`) y unos 4 MB de RAM en reposo. Interfaz bilingüe
-español/inglés (menú **Vista ▸ Idioma**), con el idioma del sistema como valor inicial.
+Written for a 2017 MacBook Air on macOS 13: Intel binary, no external dependencies,
+a single system library (`libsqlite3`) and about 4 MB of RAM at rest. Bilingual
+English/Spanish interface (**View ▸ Language**), starting from the system language.
 
-**Solo lectura.** La app no escribe en Things ni en el calendario: lee sus bases SQLite.
+**Read-only.** The app never writes to Things or Calendar: it reads their SQLite databases.
+The only action that changes anything, *Complete*, goes through Things' own URL scheme.
 
-| Vista semanal | Plan del día (Eisenhower) |
+| Week view | Day plan (Eisenhower) |
 |---|---|
-| ![semana](docs/screenshots/demo-semana.png) | ![día](docs/screenshots/demo-dia.png) |
+| ![week](docs/screenshots/demo-week.png) | ![day](docs/screenshots/demo-day.png) |
 
-Las dos capturas son del **modo demo**, con tareas y eventos inventados:
+Both screenshots come from **demo mode**, with made-up to-dos and events:
 
 ```bash
-./build.sh                              # compila build/Semana.app
-zsh Tools/demo.sh                       # genera las bases de ejemplo y abre la app
-zsh Tools/demo.sh --day                 # lo mismo, en la vista del día
+./build.sh                              # builds build/Semana.app
+zsh Tools/demo.sh                       # generates the sample databases and opens the app
+zsh Tools/demo.sh --day                 # same, in the day view
 ```
 
-El modo demo apunta la app a `build/demo/` mediante `SEMANA_THINGS_DB` y `SEMANA_CALENDAR_DB`,
-así que funciona sin Things 3 instalado y sin darle permisos a nada.
+Demo mode points the app at `build/demo/` through `SEMANA_THINGS_DB` and `SEMANA_CALENDAR_DB`,
+so it works without Things 3 installed and without granting any permissions.
 
-## Contenidos
+## Contents
 
-- [Cómo lee Things](#cómo-lee-things-y-por-qué-así)
-- [Cómo lee el calendario de Apple](#cómo-lee-el-calendario-de-apple)
-- [El plan del día](#el-plan-del-día)
-- [Construir](#construir) · [Permisos](#permisos-evitar-re-pedir-acceso-total-al-disco-en-cada-build) · [Uso](#uso)
-- [Limitaciones honestas](#limitaciones-honestas) · [Estructura](#estructura) · [El icono](#el-icono)
-- [Cinco trampas de AppKit](#cinco-trampas-de-appkit-que-costaron-la-ventana)
+- [How it reads Things](#how-it-reads-things-and-why)
+- [How it reads Apple Calendar](#how-it-reads-apple-calendar)
+- [The day plan](#the-day-plan)
+- [Build](#build) · [Permissions](#permissions-avoid-re-granting-full-disk-access-on-every-build) · [Usage](#usage)
+- [Honest limitations](#honest-limitations) · [Layout](#layout) · [The icon](#the-icon)
+- [Five AppKit traps](#five-appkit-traps-that-cost-the-window)
 
-Licencia MIT.
+MIT licence.
 
-## Cómo lee Things (y por qué así)
+## How it reads Things (and why)
 
-Things 3 **no expone una API de lectura**. Su esquema de URL (`things:///…`) solo sirve
-para crear, abrir, completar o cancelar. Por eso la app lee la base SQLite de Things,
-**siempre sin escribir en ella**, con dos rutas en este orden:
+Things 3 **has no read API**. Its URL scheme (`things:///…`) can create, show and update
+items, but not list them. So the app reads the Things SQLite database,
+**never writing to it**, through two paths in this order:
 
-1. **Base viva en modo solo lectura** (`SQLITE_OPEN_READONLY`). SQLite atiende la
-   lectura por MVCC desde el WAL: no bloquea a Things ni toca el archivo. Es la misma
-   vía que usa el MCP de Things que ya tienes instalado, y evita copiar 31 MB en cada
-   refresco.
-2. **Espejo temporal**, si lo anterior falla: copia `main.sqlite` + `-wal` + `-shm` a
-   `$TMPDIR/ThingsWeek.read`, valida con `PRAGMA quick_check`, y trabaja sobre la copia
-   (abierta en lectura-escritura *solo para que SQLite pueda rehacer su índice WAL*).
-   La copia se borra al terminar.
+1. **Live database in read-only mode** (`SQLITE_OPEN_READONLY`). SQLite serves the read
+   via MVCC from the WAL: it doesn't block Things or touch the file. It's the same path
+   the Things MCP server uses, and it avoids copying 31 MB on every refresh.
+2. **Temporary mirror**, if the above fails: copies `main.sqlite` + `-wal` + `-shm` to
+   `$TMPDIR/ThingsWeek.read`, validates it with `PRAGMA quick_check`, and works on the copy
+   (opened read-write *only so SQLite can rebuild its WAL index*).
+   The copy is deleted afterwards.
 
-La barra de estado dice en cada momento qué ruta se usó.
+The status bar always says which path was used.
 
-Acciones: **Abrir en Things** y **Completar** salen por el esquema de URL oficial
-(`things:///show` y `things:///update?completed=true`). Nada en la app modifica tu
-biblioteca directamente: es Things quien aplica el cambio.
+Actions: **Open in Things** and **Complete** go through the official URL scheme
+(`things:///show` and `things:///update?completed=true`). Nothing in the app modifies your
+library directly: Things applies the change.
 
-`update` exige el token de autorización de Things. Semana lo lee de la tabla `TMSettings`
-de la misma base, así que no hay que copiarlo a mano; basta con tener activado
-*Things → Ajustes → General → Activar URL de Things*. Si no lo está, Completar avisa en vez
-de fallar en silencio. Las tareas **repetitivas** no se pueden completar desde fuera
-(limitación del esquema de Things), así que la opción aparece desactivada en ellas.
+`update` requires Things' authorization token. Semana reads it from the `TMSettings` table
+of the same database, so there's nothing to paste by hand; you only need
+*Things → Settings → General → Enable Things URLs* turned on. If it isn't, Complete tells you
+instead of failing silently. **Repeating** to-dos can't be completed from outside
+(a limitation of the Things URL scheme), so the option is disabled for them.
 
-### El formato de fechas (no es un epoch)
+### The date format (it's not an epoch)
 
-Los enteros `startDate`, `deadline` y `rt1_nextInstanceStartDate` de Things no son
-segundos ni días desde una fecha base: son **bits empaquetados**
+The `startDate`, `deadline` and `rt1_nextInstanceStartDate` integers in Things are neither
+seconds nor days since a base date: they are **packed bits**
 
 ```
-YYYYYYYYYYYMMMMDDDDD0000000        año << 16 | mes << 12 | día << 7
+YYYYYYYYYYYMMMMDDDDD0000000        year << 16 | month << 12 | day << 7
 ```
 
-Cualquier intento de tratarlos como epoch deriva: el paso vale 128 por día *dentro* del
-mismo mes y salta al cambiar de mes, así que un ajuste lineal acumula 1, 2 o incluso
-138 días de error según el rango. La app decodifica con las máscaras
-`134152192 / 61440 / 3968` (año, mes, día), el mismo esquema que usa `things-py`, y el
-resultado se verificó contra fechas reales mostradas por Things.
+Any attempt to treat them as an epoch drifts: the step is 128 per day *within* a month
+and jumps at month boundaries, so a linear fit accumulates 1, 2 or even 138 days of error
+depending on the range. The app decodes them with the masks
+`134152192 / 61440 / 3968` (year, month, day), the same scheme `things-py` uses, and the
+result was checked against real dates shown by Things.
 
-Reglas de lectura usadas:
+Reading rules used:
 
-| Campo | Significado |
+| Field | Meaning |
 |---|---|
-| `type` | 0 = tarea, 1 = proyecto, 2 = encabezado (los encabezados no se listan) |
-| `status` | 0 = abierta (2 canceladas y 3 completadas quedan fuera) |
-| `trashed` | 1 excluye la fila |
-| `start` | 0 Bandeja · 1 En cualquier momento · 2 Alguna vez |
-| `rt1_recurrenceRule IS NOT NULL` | tarea recurrente |
-| `rt1_nextInstanceStartDate` | próxima ocurrencia; en recurrentes manda sobre `startDate`, que guarda el ancla original |
-| `rt1_instanceCreationPaused` | 1 = en pausa, Things no la muestra, la app tampoco |
+| `type` | 0 = to-do, 1 = project, 2 = heading (headings aren't listed) |
+| `status` | 0 = open (2 cancelled and 3 completed are left out) |
+| `trashed` | 1 excludes the row |
+| `start` | 0 Inbox · 1 Anytime · 2 Someday |
+| `rt1_recurrenceRule IS NOT NULL` | repeating to-do |
+| `rt1_nextInstanceStartDate` | next occurrence; for repeating to-dos it wins over `startDate`, which holds the original anchor |
+| `rt1_instanceCreationPaused` | 1 = paused; Things doesn't show it, and neither does the app |
 
-**Día en que cae una tarjeta:** `deadline` si existe; si no, `startDate`. Las tareas con
-ambas se muestran una vez, en el día del plazo, con banda roja.
+**Which day a card lands on:** with both a scheduled date and a deadline, the **earlier**
+one wins (the day you planned to work on it); the deadline is shown on the card as
+`due 28/10` and as a red stripe. With only one of the two, that one decides.
 
-## Cómo lee el calendario de Apple
+## How it reads Apple Calendar
 
-La base viva es `~/Library/Calendars/Calendar.sqlitedb` (no `Calendar Cache`, ni la tabla
-`ZCALENDARITEM` que mencionan prompts antiguos: eso es Core Data de otra versión). Las
-tablas que importan:
+The live database is `~/Library/Calendars/Calendar.sqlitedb` (not `Calendar Cache`, nor the
+`ZCALENDARITEM` table older prompts mention: that's Core Data from another version). The
+tables that matter:
 
-| Tabla | Para qué |
+| Table | What for |
 |---|---|
-| `Calendar` | lista de calendarios: `ROWID`, `title`, `color`, `store_id` |
-| `Store` | la **cuenta** dueña de cada calendario: iCloud, Google, "Other" (local), "Subscribed Calendars", "Default" |
-| `CalendarItem` | el evento: `summary`, `start_date`, `end_date`, `all_day`, `hidden`, `status` |
-| `OccurrenceCache` | una fila por día ocupado: `day`, `occurrence_date`, `calendar_id`, `event_id` |
+| `Calendar` | list of calendars: `ROWID`, `title`, `color`, `store_id` |
+| `Store` | the **account** that owns each calendar: iCloud, Google, "Other" (local), "Subscribed Calendars", "Default" |
+| `CalendarItem` | the event: `summary`, `start_date`, `end_date`, `all_day`, `hidden`, `status` |
+| `OccurrenceCache` | one row per occupied day: `day`, `occurrence_date`, `calendar_id`, `event_id` |
 
-Detalles que cuestan descubrirlos:
+Details that took some digging:
 
-- **`day` y `occurrence_date` son `CFAbsoluteTime`**, no epoch Unix: segundos desde 2001,
-  así que hay que sumar `978307200` para convertirlos.
-- `OccurrenceCache.day` es la medianoche local del día, y `occurrence_date` el arranque
-  real de esa ocurrencia. Los recurrentes ya vienen expandidos ahí, por eso se consulta
-  esa tabla y no `CalendarItem` directamente.
-- `CalendarItem.end_date - start_date` da la duración; en eventos de día completo
-  `all_day = 1` y no se pinta hora.
-- Se excluyen `hidden = 1` y `status = 2` (cancelados).
-- **Calendarios apagados por defecto**: los marcadores internos (`DEFAULT_*`) y los que
-  contienen *Found in Mail*, *Found in Natural Language*, *Facebook Birthdays*,
-  *Phases of the Moon*, *Siri* o *Birthdays* en el título. Siguen apareciendo en el selector
-  **Calendarios ▾** por si los quieres activar; los `DEFAULT_*` directos no se ofrecen porque
-  nunca traen eventos tuyos.
-- La selección se guarda **por título**, no por `ROWID`: en iCloud/Google los rowids pueden
-  reordenarse entre sincronizaciones y el título es lo estable.
-- Cada línea del selector **Calendarios ▾** trae la cuenta detrás: `Trabajo · Google`,
-  `Personal · iCloud`, `Facebook Birthdays · En este Mac`, `Feriados · Suscritos`.
-  Se saca de `Store.name` (un `LEFT JOIN` por `Calendar.store_id`) y se traduce al pintar el
-  menú, no al leer la base: cambiar de idioma no obliga a recargar calendarios. Las cuentas
-  guardadas con el correo en vez de con la marca se normalizan por dominio (gmail.com →
-  Google, icloud.com/me.com → iCloud, outlook/hotmail/live → Outlook) para no mostrar
-  direcciones completas en la interfaz.
+- **`day` and `occurrence_date` are `CFAbsoluteTime`**, not Unix epoch: seconds since 2001,
+  so `978307200` must be added to convert them.
+- `OccurrenceCache.day` is the day's local midnight, and `occurrence_date` the actual start
+  of that occurrence. Repeating events are already expanded there, which is why that table
+  is queried rather than `CalendarItem` directly.
+- `CalendarItem.end_date - start_date` gives the duration; all-day events have
+  `all_day = 1` and no time is drawn.
+- `hidden = 1` and `status = 2` (cancelled) are excluded.
+- **Calendars off by default**: those whose title contains *Found in Mail*,
+  *Found in Natural Language*, *Facebook Birthdays*, *Phases of the Moon*, *Siri* or
+  *Birthdays*. They're still offered in **Calendars ▾**, under *Suggestions & system*, in
+  case you want them. Calendar's internal placeholders (`DEFAULT_*` and the `Default`
+  calendar of Apple's Default store) aren't offered at all, since they never hold your events.
+- The selection is saved **by title**, not by `ROWID`: iCloud/Google rowids can be
+  reordered between syncs and the title is what stays stable. That's also why the picker
+  shows each title once, even when it exists in several accounts.
+- The account comes from `Store.name` (a `LEFT JOIN` on `Calendar.store_id`) and is translated
+  when the picker is drawn, not when the database is read, so switching language doesn't
+  require reloading calendars. Accounts stored under an email address instead of a brand are
+  normalised by domain (gmail.com → Google, icloud.com/me.com → iCloud,
+  outlook/hotmail/live → Outlook) so full addresses never appear in the interface.
 
-Se lee en solo lectura, igual que Things, y necesita Acceso Total al Disco.
+It's read read-only, like Things, and needs Full Disk Access.
 
-## El plan del día
+## The day plan
 
-`Planner.swift` es un motor puro: recibe tareas + eventos del día y devuelve un `DayPlan`.
-La vista solo pinta. Los seis marcos disponibles:
+`Planner.swift` is a pure engine: it takes the day's to-dos + events and returns a `DayPlan`.
+The view only draws. The six frameworks:
 
-| Marco | Qué decide | Con qué señal |
+| Framework | What it decides | From which signal |
 |---|---|---|
-| Matriz de Eisenhower | 4 cuadrantes | urgencia = tag Urgent, plazo vencido o de mañana, o fecha programada pasada; importancia = tag Important o High |
-| Time blocking por energía | bloques 08:00–18:00 | tamaño estimado + hora (profundo antes que administrativo) |
-| Eat the Frog + 2 min + Parkinson | la rana, las victorias rápidas, hora de término | importancia + estimación ≥ 45 min |
-| MoSCoW | Must / Should / Could / Won't | capacidad libre del día: Must ~55 %, Should ~85 %, Won't el desborde |
-| 1-3-5 | 1 grande, 3 medianas, 5 chicas | ≥ 60 / ≥ 25 / < 25 min |
-| Pareto · Top 3 | las 3 que mueven el día | orden de prioridad del marco activo |
+| Eisenhower matrix | 4 quadrants | urgency = Urgent tag, overdue or due tomorrow, or a past scheduled date; importance = Important or High tag |
+| Time blocking by energy | 08:00–18:00 blocks | estimated size + time of day (deep work before admin) |
+| Eat the Frog + 2 min + Parkinson | the frog, quick wins, end time | importance + estimate ≥ 45 min |
+| MoSCoW | Must / Should / Could / Won't | the day's free capacity: Must ~55 %, Should ~85 %, Won't is the overflow |
+| 1-3-5 | 1 big, 3 medium, 5 small | ≥ 60 / ≥ 25 / < 25 min |
+| Pareto · Top 3 | the 3 that move the day | priority order of the active framework |
 
-**Escalera de prioridad.** La lista «Tareas del día» no sigue el orden de los cuadrantes:
-ordena por etiqueta, de más a menos, y dentro del mismo escalón decide la urgencia real
-(tag `Urgent`, plazo vencido o que cae mañana, o fecha programada ya pasada), después el
-atraso y al final lo más corto primero:
+**Priority ladder.** The *Tasks for the day* list doesn't follow quadrant order: it sorts
+by tag, highest first, and within the same rung real urgency decides
+(`Urgent` tag, overdue or due tomorrow, or a scheduled date already past), then how
+overdue it is, and finally the shortest first:
 
 ```
-Important › Urgent › High › Medium › Low › sin etiqueta
+Important › Urgent › High › Medium › Low › untagged
 ```
 
-Cada fila repite en gris la etiqueta que la colocó ahí (`Important · 45 min`), para que el
-criterio se pueda leer sin abrir Things; si no trae etiqueta y es urgente solo por calendario,
-lo dice (`30 min · urgente por calendario`). El punto de color de la izquierda usa la misma
-escalera: rojo, ámbar, azul y gris. Son tus etiquetas de Things tal cual, sin traducirlas.
+Each row repeats in grey the tag that put it there (`Important · 45 min`), so the reasoning
+can be read without opening Things; if it has no tag and is urgent only because of its date,
+it says so (`30 min · urgent by calendar`). The colour dot on the left follows the same
+ladder: red, amber, blue and grey. These are your Things tags as they are, untranslated.
 
-**Colores en la matriz.** Los cuatro cuadrantes van teñidos y con barra de acento, para
-distinguirlos sin leer: rojo *Hazlo ahora*, verde *Agenda*, ámbar *Delega o limita*, gris
-*Suéltalo*. En tema oscuro cambia la intensidad del tinte, no el color.
+**Colours in the matrix.** The four quadrants are tinted and carry an accent bar, so they
+can be told apart without reading: red *Do it now*, green *Schedule it*, amber
+*Delegate or cap it*, grey *Drop it*. In dark mode the tint's intensity changes, not its colour.
 
-**Esfuerzo estimado** (no hay campo de duración en Things): si el título o la nota dicen
-"25 min" o "1h30", se usa eso; si no, `nº de ítems de checklist × 10`; si no, 90 min para
-proyectos, 45 para tag High, 15 para Low, 30 por defecto. Es una estimación, no un dato.
+**Estimated effort** (Things has no duration field): if the title or notes say
+"25 min" or "1h30", that's used; otherwise `number of checklist items × 10`; otherwise 90 min
+for projects, 45 for the High tag, 15 for Low, 30 by default. It's an estimate, not a fact.
 
-**Capacidad**: 600 min de jornada (08:00–18:00) menos lo que ya ocupan tus eventos menos
-60 min de pausas. La barra de estado muestra demanda vs capacidad, y el timeline deja de
-asignar cuando se acaba la jornada: si algo queda fuera, aparece como tal en vez de
-aplastarse contra las 18:00.
+**Capacity**: a 600-minute working day (08:00–18:00) minus what your events already take,
+minus 60 min of breaks. The status bar shows demand vs capacity, and the timeline stops
+assigning when the day runs out: anything left over shows up as such instead of being
+squashed against 18:00.
 
-Los eventos del calendario mandan sobre las tareas en el timeline: un bloque nunca pisa una
-cita, y las pausas largas solo se ponen si el hueco de las 13:00 está libre.
+Calendar events win over to-dos in the timeline: a block never overlaps an appointment,
+and the long break is only added if the 13:00 slot is free.
 
-## Construir
+## Build
 
 ```bash
-cd ThingsWeek
-./build.sh                      # produce build/Semana.app (firma ad-hoc)
+git clone https://github.com/RizaMora7/Week-Things-3.git
+cd Week-Things-3
+./build.sh                      # produces build/Semana.app (ad-hoc signed)
 open build/Semana.app
 ```
 
-Opciones del build:
+Build options:
 
 ```bash
-SIGN_ID="Semana Dev" ./build.sh                 # firma con identidad estable
-INSTALL_DIR=/Applications ./build.sh            # instala en ruta fija (sin sudo si eres admin)
+SIGN_ID="Semana Dev" ./build.sh                 # sign with a stable identity
+INSTALL_DIR=/Applications ./build.sh            # install to a fixed path (no sudo if you're an admin)
+OPTIMIZE=1 ./build.sh                           # optimised binary (whole-module -O takes minutes)
 ```
 
-## Permisos: evitar re-pedir Acceso Total al Disco en cada build
+The build targets Intel (`x86_64-apple-macosx13.0`). On Apple Silicon it runs under Rosetta;
+for a native binary, change `TARGET` in `build.sh` to `arm64-apple-macosx13.0`.
 
-La base vive en un *Group Container*, y macOS solo deja leerlo a apps con el
-entitlement de ese grupo o con **Acceso Total al Disco** (Full Disk Access, FDA). No hay
-un permiso más angosto posible para esta ruta.
+## Permissions: avoid re-granting Full Disk Access on every build
 
-FDA se recuerda por **bundle ID + hash de firma + ubicación del .app**. Con firma ad-hoc
-(`-s -`) el hash cambia en cada compilación y por eso el permiso se cae. Para que quede
-fijo:
+The Things database lives in a *Group Container*, and macOS only lets apps read it if they
+have that group's entitlement or **Full Disk Access** (FDA). There's no narrower permission
+for this path.
 
-1. **Crear una identidad de firma propia** (una sola vez):
-   Acceso a Llaveros → menú *Acceso a Llaveros ▸ Asistente del certificado…* →
-   *Crear un certificado…* → Nombre: `Semana Dev` · Tipo de certificado:
-   **Code Signing** · Equipo: ningún certificado → Crear.
-2. **Compilar siempre con esa identidad y en la misma ruta**:
+FDA is remembered by **bundle ID + signature hash + .app location**. With ad-hoc signing
+(`-s -`) the hash changes on every build, which is why the permission gets lost. To make it
+stick:
+
+1. **Create your own signing identity** (once):
+   Keychain Access → *Keychain Access ▸ Certificate Assistant ▸ Create a Certificate…* →
+   Name: `Semana Dev` · Certificate Type: **Code Signing** → Create.
+2. **Always build with that identity and to the same path**:
    ```bash
    SIGN_ID="Semana Dev" INSTALL_DIR=/Applications ./build.sh
    ```
-3. **Grantear FDA una vez** a `/Applications/Semana.app`:
-   Ajustes del Sistema → Privacidad y seguridad → Acceso Total al Disco → `+` → arrastra
-   la app → cierra y vuelve a abrir la app.
+3. **Grant FDA once** to `/Applications/Semana.app`:
+   System Settings → Privacy & Security → Full Disk Access → `+` → drag the app in →
+   quit and reopen the app.
 
-Si alguna vez TCC se porta mal tras un cambio de identidad, reinicia su registro:
+If TCC ever misbehaves after an identity change, reset its record:
 
 ```bash
 tccutil reset SystemPolicyAllFiles cl.zamorano.semana
 ```
 
-## Uso
+## Usage
 
-| Atajo | Acción |
+| Shortcut | Action |
 |---|---|
-| `⌘←` / `⌘→` | semana anterior / siguiente (en vista Semana) |
-| `⌘T` | volver a esta semana / hoy |
-| `⌘R` | recargar ahora |
-| clic en tarjeta o fila | abrir la tarea en Things |
-| clic derecho | abrir · completar · copiar título · copiar UUID |
+| `⌘←` / `⌘→` | previous / next week (Week view) |
+| `⌘T` | back to this week / today |
+| `⌘R` | reload now |
+| click a card or row | open the to-do in Things |
+| right-click | open · complete · copy title · copy UUID |
 
-- **Selector `Semana / Día`** en la barra superior. En modo Día aparecen además el
-  **selector de marco** y el stepper `◀ Hoy ▶` para moverte día a día; la fecha se recuerda.
-- **`Calendarios ▾`**: menú con checkboxes por calendario, más *Todos*, *Solo los míos* y
-  *Ninguno*. Al cambiar la selección se recarga al instante y queda guardada.
-- **Idioma**: menú **Vista ▸ Idioma** → *Sistema / Español / English*. Cambia todo al vuelo
-  (barra, menú, tablero, plan del día, menús contextuales y avisos) sin reiniciar, y se
-  recuerda. `Sistema` sigue el idioma de macOS; los nombres de tus etiquetas de Things
-  (`High`, `Urgent`, …) y los de tus proyectos no se traducen: son datos tuyos.
-- **Hoy marcado**: en la vista semanal la columna del día de hoy lleva fondo teñido, borde
-  de color y la cabecera `dom 25 · hoy`; en el plan del día el título añade `· hoy` y se
-  pinta con el color de acento.
-- **En qué día cae cada tarjeta**: una tarea ocupa un solo día. Si tiene agenda y plazo,
-  gana la fecha **anterior**, o sea el día que planeaste trabajarla; el plazo se anuncia en
-  el pie de la tarjeta como `vence 28/10` y en su franja roja. Con una sola de las dos
-  fechas, esa manda. La vista Día es más amplia: ahí la tarea aparece en cuanto se cumple
-  cualquiera de las dos.
-- **Bandeja «Sin fecha»**: rejilla de varias filas al pie de la ventana (aprovecha el alto,
-  no una sola línea con scroll horizontal). El desplegable **Alcance ▾** decide qué muestra:
-  *Relevantes a esta semana* (los proyectos/áreas que ya tienen algo con fecha en la semana
-  visible, más lo que esté en la Bandeja), *Bandeja y cualquier momento*, o *Todas sin fecha*.
-  Se pliega con `▾ Sin fecha`.
-- **Auto-refresco** apagable (30 s, 2, 5, 15 min). Compara la fecha de modificación de la
-  base y se salta el trabajo si no cambió, para no gastar batería de más.
-- **Tema automático** por hora: oscuro de 19:00 a 06:59, con override manual.
-- **Buscador** sobre título, proyecto, área, etiquetas y notas. El filtro se aplica también
-  al plan del día: lo que no pase el filtro no entra en la matriz ni en el timeline.
-- **Filtros**: todas, solo con fecha, solo plazos, solo proyectos.
-- **`Abrir al iniciar sesión`** en el menú de la app (usa `SMAppService`, macOS 13+).
-- Se recuerdan vista, día, marco, semana, filtro, búsqueda, calendarios activos, tema,
-  idioma, alcance de la bandeja, intervalo de refresco, bandeja plegada y tamaño de ventana.
-- La barra de estado dice en cada modo lo que importa: en Semana, totales y qué ruta de
-  lectura se usó; en Día, el marco activo, demanda vs capacidad, eventos, nº de bloques y
-  hora de la última lectura.
+- **`Week / Day` selector** in the top bar. In Day mode the **framework selector** and the
+  `◀ Today ▶` stepper also appear to move day by day; the date is remembered.
+- **`Calendars ▾`**: a panel that stays open while you tick boxes, grouped by account
+  (iCloud, Google, Subscribed…) with each calendar's colour, plus *All*, *Only mine* and
+  *None*. Changes are saved immediately and the board reloads a moment after the last one.
+- **Language**: **View ▸ Language** → *System / Spanish / English*. Everything switches on
+  the fly (bar, menu, board, day plan, context menus and notices) without restarting, and
+  it's remembered. `System` follows the macOS language; the names of your Things tags
+  (`High`, `Urgent`, …) and projects aren't translated: they're your data.
+- **Today highlighted**: in the week view today's column gets a tinted background, a
+  coloured border and a `Sun 25 · today` header; in the day plan the title adds `· today` and
+  is drawn in the accent colour.
+- **Which day each card lands on**: a to-do occupies a single day. If it has both a scheduled
+  date and a deadline, the **earlier** date wins, i.e. the day you planned to work on it; the
+  deadline is shown in the card's footer as `due 28/10` and in its red stripe. With only one
+  of the two, that one decides. The Day view is broader: a to-do appears there as soon as
+  either date is reached.
+- **Undated tray**: a multi-row grid at the bottom of the window (it uses the height instead
+  of a single horizontally scrolling row). The **Scope ▾** pop-up decides what it shows:
+  *Relevant to this week* (projects/areas that already have something dated in the visible
+  week, plus whatever is in the Inbox), *Inbox and anytime*, or *All undated*.
+  It collapses with `▾ Undated`.
+- **Auto-refresh**, can be turned off (30 s, 2, 5, 15 min). It compares the database's
+  modification date and skips the work if nothing changed, to save battery.
+- **Automatic theme** by time of day: dark from 19:00 to 06:59, with a manual override.
+- **Search** over title, project, area, tags and notes. The filter also applies to the day
+  plan: whatever doesn't match stays out of the matrix and the timeline.
+- **Filters**: all, dated only, deadlines only, projects only.
+- **`Launch at login`** in the app menu (uses `SMAppService`, macOS 13+).
+- View, day, framework, week, filter, search, active calendars, theme, language, tray scope,
+  refresh interval, collapsed tray and window size are all remembered.
+- The status bar shows what matters in each mode: in Week, totals and which read path was
+  used; in Day, the active framework, demand vs capacity, events, number of blocks and the
+  time of the last read.
 
-## Limitaciones honestas
+## Honest limitations
 
-- **El tema no siempre persiste**: elegir *Oscuro* puede volver a *Claro* al relanzar. El
-  idioma sí se guarda, así que la sospecha está en `applyThemeMode` y en cómo el
-  `NSPopUpButton` reenvía su acción cuando se le selecciona un índice por código. Sin arreglar.
-- **Refresco**: las tareas *sin fecha* no envejecen solas en la base. Things calcula
-  "Hoy" al abrirse; si no abres Things, una tarea programada para ayer seguirá apareciendo
-  en su día y no en atrasadas hasta que Things vuelva a escribir. La app no simula ese
-  motor.
-- **Recurrencias**: se lee la próxima ocurrencia que Things ya calculó
-  (`rt1_nextInstanceStartDate`); la app no corre su propio motor de recurrencia, así que
-  una recurrente muy antigua sin instancia próxima puede no aparecer.
-- **Plazos de proyecto**: los proyectos con plazo se muestran como tarjetas marcadas, pero
-  Things propaga el plazo del proyecto a sus tareas en algunos casos: puede ver la misma
-  fecha en dos tarjetas distintas.
-- **Solo lectura**: completar desde la app delega en Things por URL, así que necesita que
-  Things esté instalado (no hace falta que esté en primer plano).
-- **Firma**: sin Developer ID, Gatekeeper exige clic derecho → Abrir la primera vez, y TCC
-  recuerda la app por su firma.
-- **Estimación de esfuerzo**: los minutos del plan son deducidos (título/nota → checklist →
-  etiquetas → 30 por defecto). Sirven para repartir el día, no para comprometerse con ellos.
-- **Eisenhower y tus etiquetas**: la matriz solo discrimina con `Important`, `High` y `Urgent`.
-  Si un día está lleno de `Medium` y `Low`, Q1 y Q3 salen cortos y «Suéltalo» grande: es la
-  lectura correcta, no un fallo. MoSCoW y 1-3-5 no dependen de las etiquetas.
-- **Calendario**: se muestra lo que `OccurrenceCache` ya expandió. Un recurrente recién
-  creado o con un rango fuera de lo que Calendar cacheó puede tardar en aparecer; la app no
-  calcula recurrencias por su cuenta.
-- **Ancho de ventana**: se puede arrastrar libremente desde los 900 pt declarados hasta el
-  tamaño de la pantalla. Las ocho columnas se reparten el ancho visible; por debajo de
-  ~912 pt aparece scroll horizontal en la franja del tablero. En ventanas muy estrechas
-  los desplegables de la barra se truncan (`Se…`, `To…`): es el cambio que hace AppKit por
-  defecto cuando el contenido no cabe, y solo se ve si arrastras la ventana a menos de
+- **The theme doesn't always persist**: choosing *Dark* may come back as *Light* on relaunch.
+  The language is saved correctly, so the suspect is `applyThemeMode` and how the
+  `NSPopUpButton` re-sends its action when an index is selected in code. Not fixed yet.
+- **Refresh**: *undated* to-dos don't age on their own in the database. Things computes
+  "Today" when it opens; if you don't open Things, a to-do scheduled for yesterday keeps
+  showing on its day rather than in Overdue until Things writes again. The app doesn't
+  simulate that engine.
+- **Repeating to-dos**: the app reads the next occurrence Things has already computed
+  (`rt1_nextInstanceStartDate`); it doesn't run its own recurrence engine, so a very old
+  repeating to-do with no upcoming instance may not show up. They also can't be completed
+  from the app (Things' URL scheme doesn't allow it).
+- **Project deadlines**: projects with a deadline show up as marked cards, but Things
+  propagates a project's deadline to its to-dos in some cases: you may see the same date on
+  two different cards.
+- **Complete needs Things**: it's delegated to Things via URL, so Things must be installed
+  with *Enable Things URLs* turned on (it doesn't need to be in the foreground).
+- **Signing**: without a Developer ID, Gatekeeper requires right-click → Open the first time,
+  and TCC remembers the app by its signature.
+- **Effort estimates**: the plan's minutes are inferred (title/notes → checklist →
+  tags → 30 by default). They're for laying out the day, not for committing to.
+- **Eisenhower and your tags**: the matrix only discriminates with `Important`, `High` and
+  `Urgent`. If a day is full of `Medium` and `Low`, Q1 and Q3 come out short and *Drop it*
+  large: that's the correct reading, not a bug. MoSCoW and 1-3-5 don't depend on tags.
+- **Calendar**: what's shown is what `OccurrenceCache` has already expanded. A newly created
+  repeating event, or one with a range outside what Calendar cached, may take a while to
+  appear; the app doesn't compute recurrences itself.
+- **Window width**: it can be dragged freely from the declared 900 pt up to the screen size.
+  The eight columns share the visible width; below ~912 pt the board strip gets horizontal
+  scrolling. In very narrow windows the bar's pop-ups truncate (`We…`, `Al…`): that's
+  AppKit's default when content doesn't fit, and it only shows if you drag the window below
   ~1100 pt.
 
-## Estructura
+## Layout
 
 ```
 Sources/
-  ThingsDate.swift      decodificación de fechas empaquetadas en bits
-  Strings.swift         tabla bilingüe ES/EN: L.s / L.f / L.n y el tipo Lang
-  SQLiteDB.swift        envoltura mínima de libsqlite3
-  ThingsStore.swift     descubrimiento de la DB, lectura directa + espejo, consultas
-  CalendarStore.swift   Calendar.sqlitedb: calendarios con su cuenta y eventos por día
-  Planner.swift         motor del plan diario: los 6 marcos, escalera de prioridad y bloques
-  Models.swift          TaskItem, Board, utilidades de semana y formato por idioma
-  Theme.swift           paleta claro/oscuro, tintes de cuadrante, preferencias
-  Views.swift           TaskCard, WeekColumnView, EventRow y la rejilla UndatedTrayView
-  DayPlanView.swift     render del DayPlan: matriz/MoSCoW/1-3-5/Top-3 + timeline + lista
-  BoardController.swift ventana, navegación semana/día, filtros, refresco, acciones
-  AppDelegate.swift     menú (incluido Idioma), primer arranque, arranque con la sesión
-  main.swift            entrada
-Tools/iconpack.swift    recorta un icono de una lámina y lo entrega como maestro con transparencia
-Tools/mkiconset.sh      maestro PNG → AppIcon.iconset → AppIcon.icns (las 10 medidas canónicas)
-Tools/makeicon.swift    generador antiguo, dibujado por código (sigue sirviendo de base)
-Tools/ordercheck.swift  arnés: imprime el orden de la escalera de prioridad (ES y EN)
-Tools/shot.sh           captura la ventana para revisar la interfaz
-build.sh                swiftc + bundle .app + Info.plist + firma
+  ThingsDate.swift      decoding of bit-packed dates
+  Strings.swift         bilingual ES/EN table: L.s / L.f / L.n and the Lang type
+  SQLiteDB.swift        minimal libsqlite3 wrapper
+  ThingsStore.swift     DB discovery, direct read + mirror, queries, URL-scheme actions
+  CalendarStore.swift   Calendar.sqlitedb: calendars with their account and events per day
+  CalendarPicker.swift  the Calendars ▾ popover: grouped by account, colour dots, bulk actions
+  Planner.swift         daily plan engine: the 6 frameworks, priority ladder and blocks
+  Models.swift          TaskItem, Board, week helpers and per-language formatting
+  Theme.swift           light/dark palette, quadrant tints, preferences
+  Views.swift           TaskCard, WeekColumnView, EventRow and the UndatedTrayView grid
+  DayPlanView.swift     DayPlan rendering: matrix/MoSCoW/1-3-5/Top 3 + timeline + list
+  BoardController.swift window, week/day navigation, filters, refresh, actions
+  AppDelegate.swift     menu (including Language), first launch, launch at login
+  main.swift            entry point
+Tools/demo.sh           builds the demo databases and opens the app on them
+Tools/makedemo.sh       generates the made-up Things + Calendar databases in build/demo/
+Tools/iconpack.swift    crops an icon from a reference sheet into a master with transparency
+Tools/mkiconset.sh      PNG master → AppIcon.iconset → AppIcon.icns (the 10 canonical sizes)
+Tools/makeicon.swift    older code-drawn generator (still useful as a base)
+Tools/ordercheck.swift  harness: checks the priority ladder and Eisenhower quadrants (ES and EN)
+Tools/shot.sh           captures the window to review the interface
+build.sh                swiftc + .app bundle + Info.plist + signing
 ```
 
-## El icono
+## The icon
 
-`Resources/AppIcon.icns` sale de una lámina de referencia, no se dibuja por código. La cadena:
+`Resources/AppIcon.icns` comes from a reference sheet; it isn't drawn in code. The pipeline:
 
 ```bash
 xcrun swiftc -framework AppKit -o build/iconpack Tools/iconpack.swift
-build/iconpack probe  lamina.png 150 520 0 450      # localiza el borde del squircle
-build/iconpack crop   lamina.png build/master.png 58 165 390 497
+build/iconpack probe  sheet.png 150 520 0 450      # finds the squircle's edge
+build/iconpack crop   sheet.png build/master.png 58 165 390 497
 zsh Tools/mkiconset.sh build/master.png Resources/AppIcon
 ```
 
-`crop` aplica una máscara de esquinas con radio del 20 %, así el maestro queda con
-transparencia real en lugar del fondo blanco (o del tablero de ajedrez) de la lámina.
-Dos trampas de `iconutil`: el prefijo de los archivos es literalmente `icon_`, no el nombre
-de la app, y solo reconoce 16/32/128/256/512 con su `@2x`; con cualquier otro nombre falla
-con un escueto «Failed to generate ICNS».
+`crop` applies a corner mask with a 20 % radius, so the master gets real transparency
+instead of the sheet's white background (or checkerboard). Two `iconutil` traps: the file
+prefix is literally `icon_`, not the app's name, and it only recognises 16/32/128/256/512
+with their `@2x`; with any other name it fails with a terse "Failed to generate ICNS".
 
-Hay dos maestros en `Resources/`: `AppIcon.icns` (modo claro, el que usa el bundle) y
-`AppIconDark.icns` (modo oscuro, guardado para cambiarlo si algún día hace falta).
+There are two masters in `Resources/`: `AppIcon.icns` (light mode, used by the bundle) and
+`AppIconDark.icns` (dark mode, kept in case it's ever needed).
 
-## Diagnóstico de geometría
+## Geometry diagnostics
 
-Para diagnóstico visual de la geometría: `SEMANA_DEBUG=1 build/Semana.app/Contents/MacOS/Semana`
-vuelca por stderr el marco de la ventana, de cada vista y de las columnas.
+For visual geometry diagnostics: `SEMANA_DEBUG=1 build/Semana.app/Contents/MacOS/Semana`
+dumps the frame of the window, each view and the columns to stderr.
 
-## Cinco trampas de AppKit que costaron la ventana
+## Five AppKit traps that cost the window
 
-Están aquí para no volver a meterlas:
+Kept here so they don't come back:
 
-1. **El mínimo de la ventana lo manda el contenido, no `window.contentMinSize`.** Puedes
-   poner `contentMinSize = 900 × 480` y la ventana seguirá sin bajar de lo que exijan sus
-   restricciones. En esta app el piso llegó a ser 1840 pt con tres focos distintos: las
-   etiquetas de `EventRow` (un título de evento largo pedía su ancho completo), la suma de
-   las tarjetas de la bandeja (5 × 212 pt) y los seis desplegables de la barra.
-2. **El cálculo del mínimo trata como duras las restricciones de prioridad 250 hacia
-   arriba.** Es el detalle que costó encontrar: el ancho de 212 pt de cada tarjeta de la
-   bandeja estaba a prioridad 900 y seguía inflando el mínimo; a 600 pasó lo mismo; a 200
-   la ventana bajó de 1148 pt a 912. La regla práctica: un *deseo* de tamaño (ancho de
-   tarjeta, ancho del buscador) va por debajo de 250, y por encima de lo que huguee el
-   espaciador que debe ceder. Las etiquetas que puedan truncarse, con
+1. **The window's minimum is set by its content, not by `window.contentMinSize`.** You can
+   set `contentMinSize = 900 × 480` and the window still won't go below what its
+   constraints demand. In this app the floor reached 1840 pt from three separate sources: the
+   `EventRow` labels (a long event title asked for its full width), the sum of the tray's
+   cards (5 × 212 pt) and the bar's six pop-ups.
+2. **The minimum-size calculation treats constraints of priority 250 and above as hard.**
+   This was the hard one to find: each tray card's 212 pt width was at priority 900 and kept
+   inflating the minimum; at 600 the same happened; at 200 the window went from 1148 pt down
+   to 912. The rule of thumb: a size *wish* (card width, search field width) goes below 250,
+   and above whatever the spacer that should give way hugs at. Labels that may truncate get
    `setContentCompressionResistancePriority(.defaultLow, …)`.
-3. **`NSStackView` fija `últimaVista.trailing == stack.trailing` como restricción
-   requerida**, así que una fila hereda el ancho de su contenido. En la bandeja cada fila se
-   ancla ahora con `fila <= rejilla − 2·inset` (no `==`) y cierra con un espaciador colapsable
-   que absorbe el sobrante para que las tarjetas no se estiren.
-4. **`isHidden` NO saca una vista del Auto Layout.** La bandeja plegada seguía ocupando sus
-   200 pt de alto y la cabecera oculta robándole ancho al plan del día hasta que también se
-   colapsan sus `heightAnchor` (constante 0 en `applyTrayLayout`).
-5. **Nunca redimensionar la ventana desde `windowDidResize`.** Cortocircuita el layout en
-   pleno `CATransaction` y termina en `EXC_BAD_INSTRUCTION` vía `-[NSApplication
-   _crashOnException:]`. Lo mismo con la restauración de estado de macOS: revive marcos de
-   monitores ya desconectados, así que la ventana usa `isRestorable = false` y valida (y
-   borra) la clave `NSWindow Frame ThingsWeekMain` antes de fijar el autosave.
+3. **`NSStackView` pins `lastView.trailing == stack.trailing` as a required constraint**,
+   so a row inherits its content's width. In the tray each row is now anchored with
+   `row <= grid − 2·inset` (not `==`) and ends with a collapsible spacer that absorbs the
+   leftover so the cards don't stretch.
+4. **`isHidden` does NOT remove a view from Auto Layout.** The collapsed tray kept taking its
+   200 pt of height, and the hidden header kept stealing width from the day plan, until their
+   `heightAnchor`s were collapsed too (constant 0 in `applyTrayLayout`).
+5. **Never resize the window from `windowDidResize`.** It short-circuits layout in the middle
+   of a `CATransaction` and ends in `EXC_BAD_INSTRUCTION` via `-[NSApplication
+   _crashOnException:]`. Same with macOS state restoration: it revives frames from monitors
+   that are no longer connected, so the window uses `isRestorable = false` and validates (and
+   deletes) the `NSWindow Frame ThingsWeekMain` key before setting the autosave name.

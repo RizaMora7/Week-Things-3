@@ -1,7 +1,7 @@
-// Herramienta de un solo uso: genera Resources/AppIcon.icns sin dependencias.
-// Dibuja un tablero semanal (7 columnas, una destacada) con CoreGraphics.
+// One-off tool: generates Resources/AppIcon.icns with no dependencies.
+// Draws a weekly board (7 columns, one highlighted) with CoreGraphics.
 //
-//   swift Tools/makeicon.swift  (desde la carpeta del proyecto)
+//   swift Tools/makeicon.swift  (from the project folder)
 import AppKit
 import Foundation
 
@@ -23,10 +23,10 @@ func drawIcon(px: Int) -> Data? {
     NSGraphicsContext.current = ctx
     let cg = ctx.cgContext
 
-    let s = CGFloat(px) / 512.0          // todo el trazado se define en un lienzo de 512
+    let s = CGFloat(px) / 512.0          // the whole drawing is defined on a 512 canvas
     let rect = CGRect(x: 0, y: 0, width: 512, height: 512)
 
-    // Fondo: redondeado con degradado azul profundo (legible en claro y oscuro).
+    // Background: rounded, with a deep-blue gradient (readable in light and dark).
     let radius: CGFloat = 108 * s
     let bg = CGPath(roundedRect: rect, cornerWidth: radius, cornerHeight: radius, transform: nil)
     cg.saveGState()
@@ -41,13 +41,13 @@ func drawIcon(px: Int) -> Data? {
     }
     cg.restoreGState()
 
-    // Cabecera del tablero.
+    // Board header.
     let head = CGRect(x: 64 * s, y: 372 * s, width: 200 * s, height: 34 * s)
     cg.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 0.92))
     cg.addPath(CGPath(roundedRect: head, cornerWidth: 17 * s, cornerHeight: 17 * s, transform: nil))
     cg.fillPath()
 
-    // Siete columnas; la tercera destacada (hoy).
+    // Seven columns; the third highlighted (today).
     let cols = 7, gap: CGFloat = 12 * s
     let areaW = 512 - 128 * s
     let colW = (areaW - gap * CGFloat(cols - 1)) / CGFloat(cols)
@@ -62,7 +62,7 @@ func drawIcon(px: Int) -> Data? {
         cg.addPath(CGPath(roundedRect: colRect, cornerWidth: 12 * s, cornerHeight: 12 * s, transform: nil))
         cg.fillPath()
 
-        // Tareas dentro de la columna.
+        // Tasks inside the column.
         let rows = highlighted ? 4 : (i % 2 == 0 ? 3 : 2)
         var y = topY - 16 * s
         for r in 0..<rows {
@@ -78,7 +78,7 @@ func drawIcon(px: Int) -> Data? {
         }
     }
 
-    // Punto de acento en la columna destacada.
+    // Accent dot on the highlighted column.
     cg.setFillColor(CGColor(red: 0.20, green: 0.86, blue: 0.60, alpha: 1))
     cg.fillEllipse(in: CGRect(x: baseX + 2 * (colW + gap) + colW - 22 * s,
                               y: topY - 6 * s, width: 16 * s, height: 16 * s))
@@ -103,7 +103,7 @@ task.arguments = ["-c", "icns", iconSet.path, "-o", outDir.appendingPathComponen
 try? task.run()
 task.waitUntilExit()
 if task.terminationStatus == 0 {
-    print("→ Resources/AppIcon.icns generado")
+    print("→ Resources/AppIcon.icns generated")
 } else {
-    print("⚠ iconutil falló (status \(task.terminationStatus)); PNGs quedaron en \(iconSet.path)")
+    print("⚠ iconutil failed (status \(task.terminationStatus)); PNGs left in \(iconSet.path)")
 }

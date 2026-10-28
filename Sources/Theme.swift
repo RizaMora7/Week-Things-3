@@ -28,14 +28,14 @@ struct Palette {
     let separator: NSColor
     let badgeText: NSColor
 
-    /// Fondo y borde de un cuadrante de la matriz de Eisenhower.
+    /// Background and edge of an Eisenhower matrix quadrant.
     func quadrantTint(_ q: Quadrant) -> (bg: NSColor, edge: NSColor) {
         let edge: NSColor
         switch q {
-        case .q1: edge = deadline            // hazlo ahora
-        case .q2: edge = todayAccent         // agenda
-        case .q3: edge = warn                // delega
-        case .q4: edge = meta                // suéltalo
+        case .q1: edge = deadline            // do it now
+        case .q2: edge = todayAccent         // schedule
+        case .q3: edge = warn                // delegate
+        case .q4: edge = meta                // let it go
         }
         return (edge.withAlphaComponent(dark ? 0.20 : 0.12), edge.withAlphaComponent(dark ? 0.55 : 0.45))
     }
@@ -46,7 +46,7 @@ struct Palette {
         switch mode {
         case .light: return false
         case .dark: return true
-        case .auto: return hour >= 19 || hour < 7      // 19:00–06:59 nocturno
+        case .auto: return hour >= 19 || hour < 7      // 19:00–06:59 is night
         }
     }
 
@@ -92,7 +92,7 @@ struct Palette {
     }
 }
 
-/// Preferencias persistentes (UserDefaults estándar, sin almacenamiento del navegador).
+/// Persistent preferences (standard UserDefaults, no browser storage).
 final class Prefs {
     static let shared = Prefs()
     private let d = UserDefaults.standard
@@ -138,33 +138,33 @@ final class Prefs {
     var compactCards: Bool { get { d.bool(forKey: Key.density) } set { d.set(newValue, forKey: Key.density) } }
     var hasLaunchedBefore: Bool { get { d.bool(forKey: Key.launched) } set { d.set(newValue, forKey: Key.launched) } }
 
-    /// 0 = tablero semanal · 1 = plan diario
+    /// 0 = weekly board · 1 = daily plan
     var viewMode: Int { get { d.integer(forKey: Key.viewMode) } set { d.set(newValue, forKey: Key.viewMode) } }
     var framework: PlanFramework {
         get { PlanFramework(rawValue: d.object(forKey: Key.framework) as? Int ?? 0) ?? .eisenhower }
         set { d.set(newValue.rawValue, forKey: Key.framework) }
     }
-    /// Días respecto a hoy en la vista diaria
+    /// Days relative to today in the daily view
     var dayOffset: Int { get { d.integer(forKey: Key.dayOffset) } set { d.set(newValue, forKey: Key.dayOffset) } }
-    /// Títulos de calendarios activos. Por título y no por rowid: los rowid de
-    /// cuentas iCloud/Google pueden reordenarse tras una resincronización.
+    /// Titles of active calendars. By title rather than rowid: iCloud/Google
+    /// rowids can be reordered after a resync.
     var enabledCalendars: [String]? {
         get { d.array(forKey: Key.calendars) as? [String] }
         set { d.set(newValue, forKey: Key.calendars) }
     }
-    /// Idioma de la interfaz. Se resuelve al arrancar.
+    /// Interface language. Resolved at launch.
     var language: Lang {
         get { Lang(rawValue: d.object(forKey: Key.language) as? Int ?? 0) ?? .system }
         set { d.set(newValue.rawValue, forKey: Key.language) }
     }
-    /// Qué muestra la bandeja de sin fecha.
+    /// What the undated tray shows.
     var trayScope: TrayScope {
         get { TrayScope(rawValue: d.object(forKey: Key.trayScope) as? Int ?? 0) ?? .week }
         set { d.set(newValue.rawValue, forKey: Key.trayScope) }
     }
 }
 
-/// Alcance de la bandeja «sin fecha».
+/// Scope of the «undated» tray.
 enum TrayScope: Int, CaseIterable {
     case week = 0, inbox = 1, all = 2
 

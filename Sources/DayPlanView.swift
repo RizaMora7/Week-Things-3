@@ -1,7 +1,7 @@
 import AppKit
 
-/// Render nativo del plan diario. Recibe un DayPlan y pinta las cuatro secciones
-/// que ya conoces del HTML: panel del marco, timeline, lista y directrices.
+/// Native rendering of the daily plan. Takes a DayPlan and draws the four sections
+/// you already know from the HTML: framework panel, timeline, list and guidelines.
 final class DayPlanView: NSView {
     private let scroll = NSScrollView()
     private let stack = NSStackView()
@@ -62,7 +62,7 @@ final class DayPlanView: NSView {
         }
     }
 
-    // MARK: cabecera
+    // MARK: header
 
     private func addHeader(_ plan: DayPlan) {
         let overdue = (plan.quadrants.values.flatMap { $0 }).filter {
@@ -83,7 +83,7 @@ final class DayPlanView: NSView {
         [title, sub, stats].forEach { addFullWidth($0) }
     }
 
-    // MARK: panel del marco
+    // MARK: framework panel
 
     private func addFrameworkPanel(_ plan: DayPlan) {
         switch plan.framework {
@@ -108,8 +108,8 @@ final class DayPlanView: NSView {
             h.distribution = .fillEqually
             for q in row { h.addArrangedSubview(quadrantCard(q, plan.quadrants[q] ?? [])) }
             grid.addArrangedSubview(h)
-            // Sin esto la fila toma su ancho del contenido: una tarjeta con títulos
-            // largos desbordaba la sección y pintaba sobre su vecina.
+            // Without this the row takes its width from the content: a card with long
+            // titles overflowed the section and drew over its neighbour.
             h.widthAnchor.constraint(equalTo: grid.widthAnchor).isActive = true
         }
         section.addArrangedSubview(grid)
@@ -124,7 +124,7 @@ final class DayPlanView: NSView {
         box.layer?.borderColor = tint.edge.cgColor
         box.layer?.borderWidth = 1
         box.layer?.cornerRadius = 8
-        // Barra de acento a la izquierda: identifica el cuadrante de un vistazo.
+        // Accent bar on the left: identifies the quadrant at a glance.
         let accent = NSView()
         accent.wantsLayer = true
         accent.layer?.backgroundColor = tint.edge.cgColor
@@ -135,16 +135,16 @@ final class DayPlanView: NSView {
         let hint = label(q.hint, size: 10, weight: .regular, color: pal.meta)
         let body = NSStackView()
         body.orientation = .vertical
-        // `.width` solo es válido en pilas horizontales: en una vertical AppKit cae a
-        // `.trailing` y las líneas salían alineadas a la derecha. Se alinea por la
-        // izquierda y se fija el ancho de cada línea a mano.
+        // `.width` is only valid in horizontal stacks: in a vertical one AppKit falls back to
+        // `.trailing` and the lines came out right-aligned. Align to the
+        // left and set each line's width by hand.
         body.alignment = .leading
         body.distribution = .fill
         body.spacing = 3
         for t in items.prefix(6) {
             let l = label("· \(t.title)", size: 11, weight: .regular, color: pal.title)
-            // Una sola línea con truncado: dos líneas sin `preferredMaxLayoutWidth` harían
-            // que el campo midiera todo su texto y se comiera la mitad derecha de la matriz.
+            // A single truncated line: two lines without `preferredMaxLayoutWidth` would make
+            // the field measure its whole text and eat the right half of the matrix.
             l.maximumNumberOfLines = 1
             l.lineBreakMode = .byTruncatingTail
             body.addArrangedSubview(l)
@@ -282,7 +282,7 @@ final class DayPlanView: NSView {
         }
     }
 
-    // MARK: lista
+    // MARK: list
 
     private func addTaskList(_ plan: DayPlan) {
         var seen = Set<String>()
@@ -335,11 +335,11 @@ final class DayPlanView: NSView {
         case 0, 1: return pal.deadline        // Important / Urgent
         case 2: return pal.warn               // High
         case 3: return pal.scheduled          // Medium
-        default: return pal.meta              // Low o sin etiqueta
+        default: return pal.meta              // Low or untagged
         }
     }
 
-    // MARK: directrices
+    // MARK: guidelines
 
     private func addDirectives(_ plan: DayPlan) {
         let section = sectionBox(L.s("day.directives"))
@@ -347,13 +347,13 @@ final class DayPlanView: NSView {
             let l = label("— \(d)", size: 11.5, weight: .regular, color: pal.title)
             l.maximumNumberOfLines = 3
             section.addArrangedSubview(l)
-            // La pila alinea por el borde izquierdo: sin este tope el texto mediría lo
-            // que ocupa en una línea y se saldría de la tarjeta.
+            // The stack aligns to the left edge: without this cap the text would measure its
+            // single-line length and spill out of the card.
             l.widthAnchor.constraint(lessThanOrEqualTo: section.widthAnchor, constant: -28).isActive = true
         }
     }
 
-    // MARK: utilidades
+    // MARK: utilities
 
     private func sectionBox(_ title: String) -> NSStackView {
         let box = NSStackView()
@@ -377,9 +377,9 @@ final class DayPlanView: NSView {
         stack.addArrangedSubview(v)
     }
 
-    /// Añade a una sección y le fija el tope de ancho útil. Las secciones alinean por la
-    /// izquierda, así que sin el tope una línea larga mediría lo que ocupa en una sola
-    /// línea y se saldría de la tarjeta.
+    /// Adds to a section and caps its usable width. Sections align to the
+    /// left, so without the cap a long line would measure its single-line length
+    /// and spill out of the card.
     @discardableResult
     private func addBounded(_ v: NSView, to section: NSStackView) -> NSView {
         section.addArrangedSubview(v)
@@ -394,13 +394,13 @@ final class DayPlanView: NSView {
         l.maximumNumberOfLines = 2
         l.lineBreakMode = .byWordWrapping
         l.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        // Sin esto el campo pide el ancho de todo su texto en una línea y desborda la
-        // sección; con resistencia baja se acorta (y abarca) antes de empujar la ventana.
+        // Without this the field asks for the width of its whole text on one line and overflows the
+        // section; with low resistance it truncates (and wraps) before pushing the window.
         l.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return l
     }
 
-    /// Volcado de diagnóstico (SEMANA_DEBUG=1) para cazar secciones colapsadas.
+    /// Diagnostic dump (SEMANA_DEBUG=1) to catch collapsed sections.
     func debugDump() {
         needsLayout = true
         layoutSubtreeIfNeeded()
@@ -419,7 +419,7 @@ final class DayPlanView: NSView {
     }
 }
 
-/// Fila clicable que reenvía clic y menú contextual.
+/// Clickable row that forwards clicks and the context menu.
 final class ClickRow: NSView {
     var onClick: (() -> Void)?
     var menuProvider: (() -> NSMenu?)?
